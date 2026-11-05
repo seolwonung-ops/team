@@ -6,6 +6,7 @@
 <title>PAPS 익명 팀 구성 & 리그전 관리</title>
 <!-- 엑셀(.xlsx) 읽기/쓰기용: SheetJS 0.18.5 (인터넷 연결 필요, 없으면 붙여넣기·CSV로 대체) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --primary: #1e3a8a;
@@ -162,6 +163,13 @@
   #toast { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
   .toast-item { background: #1f2937; color: #fff; padding: 9px 14px; border-radius: 8px; font-size: .85rem; transition: opacity .3s; }
   .toast-item.err { background: #b91c1c; }
+  /* 구글 드라이브 동기화 */
+  .sync-wrap { display: inline-flex; align-items: center; gap: 4px; }
+  #syncBtn { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  #syncBtn.on { border-color: #16a34a; color: #166534; background: #f0fdf4; }
+  #syncBtn.warn { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+  #syncBtn.err { border-color: #dc2626; color: #991b1b; background: #fef2f2; }
+  #syncBanner { display: none; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -171,9 +179,13 @@
   <header>
     <div>
       <h1>PAPS 익명 팀 구성 & 리그전 관리</h1>
-      <div class="sub">나이스 PAPS 기록 기반 블라인드 팀 선발 · 비선수 역할 · 리그 경기 기록 (브라우저에 자동 저장)</div>
+      <div class="sub">나이스 PAPS 기록 기반 블라인드 팀 선발 · 비선수 역할 · 리그 경기 기록 (브라우저 자동 저장 · 구글 드라이브 동기화)</div>
     </div>
     <div class="row">
+      <span class="sync-wrap" id="syncWrap">
+        <button id="syncBtn" onclick="syncClick()" title="구글 드라이브에 데이터를 저장해 여러 PC에서 이어 쓰기">☁ 구글 드라이브 연결</button>
+        <button class="link small" id="syncOff" onclick="syncDisconnect()" style="display:none" title="이 PC에서 동기화 끄기">해제</button>
+      </span>
       <button class="accent" onclick="triggerExcelSelect()">나이스 엑셀 업로드</button>
       <button class="outline" onclick="exportTeamResult()">팀 편성표 저장</button>
       <button class="outline" onclick="backupData()">백업</button>
@@ -181,6 +193,10 @@
     </div>
   </header>
 
+  <div id="syncBanner">
+    <span>☁ 이 PC는 구글 드라이브 동기화를 쓰고 있습니다. <b>다른 PC에서 바꾼 내용</b>을 불러오려면 연결하세요.</span>
+    <button class="accent sm" onclick="syncClick()">구글 드라이브에서 불러오기</button>
+  </div>
   <div class="class-tabs" id="classTabs"></div>
 
   <div class="view-tabs">
@@ -518,18 +534,25 @@ function loadState() {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.classes) && parsed.classes.length) {
         appState = normalizeState(parsed);
-        saveState();
+        persistLocal();
         return;
       }
     }
   } catch (e) { console.warn('저장 데이터 불러오기 실패', e); }
   appState = createDefaultState();
-  saveState();
+  persistLocal();
 }
 
-function saveState() {
+// 브라우저에만 저장 (변경 시각은 그대로)
+function persistLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appState)); }
   catch (e) { toast('브라우저 저장 공간 오류: 백업 파일을 내려받아 두세요.', true); }
+}
+// 데이터가 바뀔 때마다: 변경 시각 기록 → 브라우저 저장 → 구글 드라이브 업로드 예약
+function saveState() {
+  appState.updatedAt = Date.now();
+  persistLocal();
+  if (typeof scheduleUpload === 'function') scheduleUpload();
 }
 
 const cls = () => appState.classes.find(c => c.id === appState.activeClassId) || appState.classes[0];
@@ -584,9 +607,11 @@ function toast(msg, isErr) {
   setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2400);
 }
 // 화면 안 확인/입력 창: await askConfirm('메시지') → true/false, await askPrompt('메시지', '기본값') → 문자열/null
-function askDialog(msg, withInput, def) {
+function askDialog(msg, withInput, def, labels) {
   return new Promise(resolve => {
     const back = document.getElementById('askBack'), inp = document.getElementById('askInput');
+    document.getElementById('askYes').textContent = labels?.[0] || '확인';
+    document.getElementById('askNo').textContent = labels?.[1] || '취소';
     document.getElementById('askMsg').textContent = msg;
     inp.style.display = withInput ? 'block' : 'none';
     inp.value = def ?? '';
@@ -603,6 +628,7 @@ function askDialog(msg, withInput, def) {
 }
 const askConfirm = msg => askDialog(msg, false);
 const askPrompt = (msg, def) => askDialog(msg, true, def);
+const askChoice = (msg, yesLabel, noLabel) => askDialog(msg, false, null, [yesLabel, noLabel]);
 
 function openModal(html, wide) {
   const box = document.getElementById('modalBox');
@@ -879,8 +905,8 @@ function renderClassTabs() {
     ${appState.classes.length > 1 ? `<button class="link small" onclick="deleteClass('${cls().id}')">현재 학급 삭제</button>` : ''}`;
 }
 
-function switchView(v) { appState.activeView = v; saveState(); renderAll(); }
-function selectClass(id) { appState.activeClassId = id; saveState(); renderAll(); }
+function switchView(v) { appState.activeView = v; persistLocal(); renderAll(); }
+function selectClass(id) { appState.activeClassId = id; persistLocal(); renderAll(); }
 async function addClass() {
   const name = await askPrompt('새 학급(수업) 이름', `학급 ${appState.classes.length + 1}`);
   if (name === null) return;
@@ -2073,11 +2099,188 @@ function restoreData() {
   input.click();
 }
 
+/* =========================================================
+ * 11. 구글 드라이브 동기화 (선생님 본인 구글 드라이브에 JSON 파일 1개로 저장)
+ *     - 권한: drive.file → 이 앱이 만든 파일만 접근 (다른 드라이브 파일은 못 봄)
+ * ========================================================= */
+const GOOGLE_CLIENT_ID = '782214500291-9dbu48p14j8trhtso7v0rktqbot38pro.apps.googleusercontent.com';   // Google Cloud OAuth 클라이언트 ID
+const SYNC_FILE_NAME = 'PAPS팀리그_데이터.json';
+const SYNC_META_KEY = 'paps_team_league_sync';
+const sync = { token: null, exp: 0, busy: false, timer: null, state: 'off', at: 0, tokenClient: null, waiters: [] };
+const syncMeta = (() => { try { return JSON.parse(localStorage.getItem(SYNC_META_KEY)) || {}; } catch (e) { return {}; } })();
+const saveSyncMeta = () => { try { localStorage.setItem(SYNC_META_KEY, JSON.stringify(syncMeta)); } catch (e) {} };
+const localDirty = () => (appState.updatedAt || 0) > (syncMeta.syncedUpdatedAt || 0);
+const hasStudents = s => (s?.classes || []).some(c => (c.students || []).length);
+const tokenValid = () => sync.token && Date.now() < sync.exp - 60000;
+
+function setSyncUI(state, msg) {
+  sync.state = state;
+  const b = document.getElementById('syncBtn');
+  if (!b) return;
+  if (!GOOGLE_CLIENT_ID) { document.getElementById('syncWrap').style.display = 'none'; return; }
+  const hm = t => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  const label = {
+    off: '☁ 구글 드라이브 연결',
+    connecting: '☁ 연결 중…',
+    saving: '☁ 저장 중…',
+    ok: `☁ 동기화됨 ${sync.at ? hm(sync.at) : ''}`,
+    pending: '☁ 변경 대기 · 다시 연결',
+    error: '☁ 동기화 오류 · 다시 시도'
+  }[state];
+  b.textContent = msg || label;
+  b.className = state === 'ok' || state === 'saving' ? 'on' : state === 'pending' ? 'warn' : state === 'error' ? 'err' : '';
+  document.getElementById('syncOff').style.display = syncMeta.enabled ? '' : 'none';
+  document.getElementById('syncBanner').style.display = syncMeta.enabled && !tokenValid() && state !== 'connecting' ? 'flex' : 'none';
+}
+
+function getToken(interactive) {
+  return new Promise((resolve, reject) => {
+    if (tokenValid()) return resolve(sync.token);
+    if (!window.google?.accounts?.oauth2) return reject(new Error('구글 로그인 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.'));
+    if (!interactive) return reject(new Error('need_login'));
+    if (!sync.tokenClient) {
+      sync.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: r => {
+          const w = sync.waiters.splice(0);
+          if (r.error) { w.forEach(x => x.reject(new Error(r.error))); return; }
+          sync.token = r.access_token; sync.exp = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+          w.forEach(x => x.resolve(sync.token));
+        },
+        error_callback: e => { sync.waiters.splice(0).forEach(x => x.reject(new Error(e?.type || 'popup_closed'))); }
+      });
+    }
+    sync.waiters.push({ resolve, reject });
+    sync.tokenClient.requestAccessToken({ prompt: syncMeta.enabled ? '' : 'consent', hint: syncMeta.email || undefined });
+  });
+}
+
+async function gfetch(url, opt = {}) {
+  const r = await fetch(url, { ...opt, headers: { ...(opt.headers || {}), Authorization: 'Bearer ' + sync.token } });
+  if (r.status === 401) { sync.token = null; throw new Error('need_login'); }
+  if (!r.ok) throw new Error(`드라이브 오류 ${r.status}`);
+  return r;
+}
+const DRIVE = 'https://www.googleapis.com/drive/v3/files', UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+async function findRemote() {
+  if (syncMeta.fileId) {
+    try {
+      const m = await (await gfetch(`${DRIVE}/${syncMeta.fileId}?fields=id,modifiedTime,trashed`)).json();
+      if (!m.trashed) return m;
+    } catch (e) { if (e.message === 'need_login') throw e; }
+  }
+  const q = encodeURIComponent(`name='${SYNC_FILE_NAME}' and trashed=false`);
+  const j = await (await gfetch(`${DRIVE}?q=${q}&orderBy=modifiedTime desc&fields=files(id,modifiedTime)&spaces=drive`)).json();
+  return j.files?.[0] || null;
+}
+async function downloadRemote(id) { return (await gfetch(`${DRIVE}/${id}?alt=media`)).json(); }
+async function uploadRemote(id) {
+  const body = JSON.stringify(appState);
+  if (id) {
+    return (await gfetch(`${UPLOAD}/${id}?uploadType=media&fields=id,modifiedTime`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body })).json();
+  }
+  const bd = 'paps' + Date.now();
+  const multipart = `--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: SYNC_FILE_NAME, mimeType: 'application/json', description: 'PAPS 익명 팀 구성 & 리그전 관리 앱 데이터 (자동 동기화)' })}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`;
+  return (await gfetch(`${UPLOAD}?uploadType=multipart&fields=id,modifiedTime`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${bd}` }, body: multipart })).json();
+}
+function markSynced(meta) {
+  syncMeta.enabled = true; syncMeta.fileId = meta.id; syncMeta.remoteModified = meta.modifiedTime;
+  syncMeta.syncedUpdatedAt = appState.updatedAt || 0; saveSyncMeta();
+  sync.at = Date.now(); setSyncUI('ok');
+}
+function applyRemote(remote, meta) {
+  appState = normalizeState(remote);
+  persistLocal(); markSynced(meta); renderAll();
+}
+
+// 드라이브와 이 PC 비교 → 최신 쪽으로 맞춤 (양쪽 다 바뀌었으면 물어봄)
+async function syncNow(reason) {
+  if (sync.busy) return;
+  sync.busy = true;
+  try {
+    if (!tokenValid()) { setSyncUI(localDirty() && syncMeta.enabled ? 'pending' : 'off'); return; }
+    setSyncUI('saving', '☁ 확인 중…');
+    const meta = await findRemote();
+    if (!meta) {                                         // 드라이브에 아직 파일 없음 → 이 PC 데이터로 생성
+      if (!appState.updatedAt) appState.updatedAt = Date.now();
+      persistLocal();
+      markSynced(await uploadRemote(null));
+      toast('구글 드라이브에 데이터 파일을 만들었습니다.');
+      return;
+    }
+    const remoteChanged = meta.modifiedTime !== syncMeta.remoteModified;
+    if (!remoteChanged && !localDirty()) { markSynced(meta); return; }
+    if (!remoteChanged && localDirty()) { setSyncUI('saving'); markSynced(await uploadRemote(meta.id)); return; }
+
+    const remote = await downloadRemote(meta.id);
+    const rU = remote.updatedAt || 0, lU = appState.updatedAt || 0;
+    if (rU === lU) { markSynced(meta); return; }
+    const firstOnThisPC = !syncMeta.fileId;
+    const conflict = (localDirty() && rU > (syncMeta.syncedUpdatedAt || 0)) || (firstOnThisPC && hasStudents(appState) && rU !== lU);
+    if (!conflict) {
+      if (rU > lU) { applyRemote(remote, meta); if (reason !== 'auto') toast('다른 PC에서 바꾼 내용을 불러왔습니다.'); }
+      else { setSyncUI('saving'); markSynced(await uploadRemote(meta.id)); }
+      return;
+    }
+    const fmt = t => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '기록 없음';
+    const useRemote = await askChoice(
+      `이 PC와 구글 드라이브의 데이터가 서로 다릅니다.\n\n• 구글 드라이브: ${fmt(rU)} 저장 · 학생 ${remote.classes?.reduce((a, c) => a + (c.students?.length || 0), 0) || 0}명\n• 이 PC: ${fmt(lU)} 수정 · 학생 ${appState.classes.reduce((a, c) => a + c.students.length, 0)}명\n\n어느 쪽을 쓸까요? 선택하지 않은 쪽은 덮어써집니다.\n(걱정되면 먼저 [백업]을 받아 두세요)`,
+      '구글 드라이브 데이터 쓰기', '이 PC 데이터로 덮어쓰기');
+    if (useRemote) { applyRemote(remote, meta); toast('구글 드라이브 데이터를 불러왔습니다.'); }
+    else { appState.updatedAt = Date.now(); persistLocal(); setSyncUI('saving'); markSynced(await uploadRemote(meta.id)); toast('이 PC 데이터로 구글 드라이브를 덮어썼습니다.'); }
+  } catch (e) {
+    if (e.message === 'need_login') setSyncUI(localDirty() ? 'pending' : 'off');
+    else { console.warn(e); setSyncUI('error'); toast('구글 드라이브 동기화 실패: ' + e.message, true); }
+  } finally { sync.busy = false; }
+}
+
+async function syncClick() {
+  if (!GOOGLE_CLIENT_ID) return;
+  try {
+    setSyncUI('connecting');
+    await getToken(true);
+    try {
+      const info = await (await gfetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)')).json();
+      if (info.user?.emailAddress) { syncMeta.email = info.user.emailAddress; saveSyncMeta(); }
+    } catch (e) {}
+    await syncNow('manual');
+  } catch (e) {
+    setSyncUI(syncMeta.enabled && localDirty() ? 'pending' : 'off');
+    if (!/popup_closed|access_denied/.test(e.message)) toast('구글 로그인 실패: ' + e.message, true);
+  }
+}
+async function syncDisconnect() {
+  if (!await askConfirm('이 PC에서 구글 드라이브 동기화를 끌까요?\n(드라이브의 데이터 파일과 이 PC 데이터는 그대로 남습니다)')) return;
+  try { if (sync.token) google.accounts.oauth2.revoke(sync.token, () => {}); } catch (e) {}
+  sync.token = null; Object.keys(syncMeta).forEach(k => delete syncMeta[k]); saveSyncMeta();
+  setSyncUI('off'); toast('동기화를 껐습니다.');
+}
+// 데이터 변경 후 2초 모아서 업로드
+function scheduleUpload() {
+  if (!GOOGLE_CLIENT_ID || !syncMeta.enabled) return;
+  clearTimeout(sync.timer);
+  if (!tokenValid()) { setSyncUI('pending'); return; }
+  setSyncUI('saving');
+  sync.timer = setTimeout(() => syncNow('auto'), 2000);
+}
+// 다른 창·탭에서 돌아오면 다른 PC의 변경 확인
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && syncMeta.enabled) {
+    if (tokenValid()) syncNow('auto'); else setSyncUI(localDirty() ? 'pending' : 'off');
+  }
+});
+window.addEventListener('beforeunload', e => {
+  if (syncMeta.enabled && localDirty()) { e.preventDefault(); e.returnValue = ''; }
+});
+
 /* 시작 */
 window.addEventListener('DOMContentLoaded', () => {
   loadState();
   setupDragAndDrop();
   renderAll();
+  setSyncUI(syncMeta.enabled && localDirty() ? 'pending' : 'off');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('askBack').style.display !== 'block') closeModal(); });
 </script>
