@@ -1,0 +1,2085 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAPS 익명 팀 구성 & 리그전 관리</title>
+<!-- 엑셀(.xlsx) 읽기/쓰기용: SheetJS 0.18.5 (인터넷 연결 필요, 없으면 붙여넣기·CSV로 대체) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --primary: #1e3a8a;
+    --secondary: #3b82f6;
+    --accent: #10b981;
+    --danger: #ef4444;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --soft: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 16px; line-height: 1.5; font-size: 14px; }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  header { background: #fff; padding: 18px 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,.05); margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+  h1 { font-size: 1.35rem; color: var(--primary); font-weight: 700; }
+  .sub { font-size: .82rem; color: var(--muted); }
+
+  button { background: var(--secondary); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: .88rem; white-space: nowrap; }
+  button:hover { opacity: .9; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.accent { background: var(--accent); }
+  button.danger { background: var(--danger); }
+  button.outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  button.outline:hover { background: var(--soft); opacity: 1; }
+  button.sm { padding: 4px 10px; font-size: .8rem; }
+  button.link { background: none; color: var(--muted); padding: 2px 4px; font-size: .85rem; }
+  button.link:hover { color: var(--danger); }
+
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .between { justify-content: space-between; }
+  .muted { color: var(--muted); }
+  .small { font-size: .82rem; }
+  .bold { font-weight: 700; }
+
+  /* 학급 탭 */
+  .class-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; align-items: center; }
+  .tab-btn { background: #e2e8f0; color: #475569; padding: 9px 16px; border-radius: 8px; font-weight: 600; }
+  .tab-btn.active { background: var(--primary); color: #fff; }
+  .tab-btn .cnt { font-weight: 400; opacity: .75; margin-left: 4px; font-size: .8rem; }
+  .tab-add { background: #fff; color: var(--primary); border: 1px dashed #94a3b8; }
+
+  /* 기능 탭 */
+  .view-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+  .view-btn { background: none; color: var(--muted); padding: 10px 16px; border-radius: 0; font-weight: 600; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .view-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .view-btn:hover { opacity: 1; color: var(--primary); }
+
+  .card { background: var(--card); border-radius: 12px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,.05); margin-bottom: 16px; }
+  .card-title { font-size: 1.08rem; font-weight: 700; color: var(--primary); margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; text-align: center; font-size: .88rem; }
+  th, td { border: 1px solid var(--border); padding: 7px 8px; }
+  th { background: var(--soft); font-weight: 600; white-space: nowrap; }
+  tbody tr:hover { background: #f8fafc; }
+  td.left, th.left { text-align: left; }
+  tr.dim td { color: #94a3b8; }
+
+  input, select, textarea { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: .85rem; background: #fff; color: var(--text); }
+  input.num { width: 54px; text-align: center; }
+  input.name { width: 90px; }
+
+  .grade { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
+  .g1 { background: #dcfce7; color: #166534; }
+  .g2 { background: #dbeafe; color: #1e40af; }
+  .g3 { background: #fef3c7; color: #92400e; }
+  .g4 { background: #fee2e2; color: #991b1b; }
+  .rec { font-size: .72rem; color: #94a3b8; }
+
+  /* 드래프트 */
+  .turn-card { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; }
+  .turn-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+  .summary { display: flex; gap: 18px; }
+  .summary div { text-align: center; }
+  .summary b { display: block; font-size: 1.15rem; color: var(--text); }
+  .summary span { font-size: .78rem; color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; justify-content: space-between; }
+
+  .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .team-card { background: #fff; border: 1px solid var(--border); border-top: 4px solid var(--c); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+  .team-card.turn { box-shadow: 0 0 0 2px var(--c); }
+  .team-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .team-name { font-weight: 700; color: var(--c); }
+  .turn-tag { font-size: .72rem; background: var(--c); color: #fff; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+  .cap-line { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; font-size: .82rem; }
+  .cap-line select { width: 100%; margin-top: 4px; font-size: .8rem; }
+  .member { display: flex; justify-content: space-between; align-items: center; padding: 3px 6px; border-radius: 6px; font-size: .85rem; }
+  .member:hover { background: var(--soft); }
+  .empty { color: #94a3b8; font-size: .82rem; text-align: center; padding: 14px 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-right: 6px; }
+
+  /* 역할 */
+  .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .role-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+
+  .role-edit td { vertical-align: top; }
+  .role-edit input[type=text], .role-edit textarea { width: 100%; }
+  .role-edit textarea { min-height: 52px; resize: vertical; font-family: inherit; }
+  .role-edit .ord { display: flex; flex-direction: column; gap: 2px; }
+
+  /* 선발 선수 능력치 */
+  .stat-top { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .stat-top { grid-template-columns: 1fr; } }
+  .radar-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: .8rem; margin-top: 4px; }
+  .fcell { min-width: 64px; }
+  .fbar { height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 3px; overflow: hidden; }
+  .fbar i { display: block; height: 100%; background: var(--c, var(--secondary)); }
+  td.best { background: #f0fdf4; font-weight: 700; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border-radius: 0; background: #fff; color: var(--muted); padding: 5px 12px; }
+  .seg button.on { background: var(--primary); color: #fff; }
+  .team-stat { border-left: 4px solid var(--c); padding-left: 10px; margin-bottom: 18px; }
+  .team-stat h4 { color: var(--c); margin-bottom: 6px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  tfoot td { background: var(--soft); font-weight: 700; }
+
+  /* 리그 */
+  .rank-badge { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #64748b; color: #fff; line-height: 22px; font-size: .8rem; font-weight: bold; }
+  .rank-1 { background: #eab308; } .rank-2 { background: #94a3b8; } .rank-3 { background: #b45309; }
+  .match-item { border: 1px solid var(--border); border-left: 5px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .match-item.done { border-left-color: var(--accent); }
+  .match-main { display: grid; grid-template-columns: 90px 1fr auto 1fr 110px; align-items: center; gap: 10px; }
+  .match-main .ta { text-align: right; font-weight: 600; }
+  .match-main .tb { font-weight: 600; }
+  .score-text { font-size: 1.3rem; font-weight: 800; color: var(--primary); min-width: 80px; text-align: center; }
+  .match-detail { font-size: .8rem; color: var(--muted); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .tag { display: inline-block; background: #eff6ff; color: var(--primary); font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: .8rem; }
+  .status { font-size: .75rem; padding: 1px 6px; border-radius: 4px; background: var(--soft); color: var(--muted); }
+  .status.done { background: #dcfce7; color: #166534; }
+  .badge-mvp { background: #fef3c7; color: #b45309; font-weight: bold; padding: 1px 6px; border-radius: 4px; font-size: .75rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 768px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .match-main { grid-template-columns: 1fr auto 1fr; }
+    .match-main .m-no, .match-main .m-btn { grid-column: 1 / -1; }
+  }
+
+  .dropzone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; background: #fff; }
+  .dropzone.over { border-color: var(--secondary); background: #eff6ff; }
+
+  /* 모달 & 토스트 */
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; display: none; overflow-y: auto; padding: 16px; }
+  .modal-box { background: #fff; max-width: 520px; margin: 40px auto; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .modal-box.wide { max-width: 900px; }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 14px; }
+  .modal-head h3 { color: var(--primary); font-size: 1.05rem; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-grid label { font-size: .8rem; color: var(--muted); display: block; }
+  .form-grid input { width: 100%; margin-top: 2px; }
+  #toast { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .toast-item { background: #1f2937; color: #fff; padding: 9px 14px; border-radius: 8px; font-size: .85rem; transition: opacity .3s; }
+  .toast-item.err { background: #b91c1c; }
+</style>
+</head>
+<body>
+<input type="file" id="excelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(event)">
+
+<div class="container">
+  <header>
+    <div>
+      <h1>PAPS 익명 팀 구성 & 리그전 관리</h1>
+      <div class="sub">나이스 PAPS 기록 기반 블라인드 팀 선발 · 비선수 역할 · 리그 경기 기록 (브라우저에 자동 저장)</div>
+    </div>
+    <div class="row">
+      <button class="accent" onclick="triggerExcelSelect()">나이스 엑셀 업로드</button>
+      <button class="outline" onclick="exportTeamResult()">팀 편성표 저장</button>
+      <button class="outline" onclick="backupData()">백업</button>
+      <button class="outline" onclick="restoreData()">복원</button>
+    </div>
+  </header>
+
+  <div class="class-tabs" id="classTabs"></div>
+
+  <div class="view-tabs">
+    <button class="view-btn" data-view="draft" onclick="switchView('draft')">1. 팀 드래프트</button>
+    <button class="view-btn" data-view="roles" onclick="switchView('roles')">2. 비선수 역할</button>
+    <button class="view-btn" data-view="stats" onclick="switchView('stats')">선발 선수 능력치</button>
+    <button class="view-btn" data-view="roster" onclick="switchView('roster')">명단·PAPS 관리</button>
+    <button class="view-btn" data-view="teams" onclick="switchView('teams')">팀 설정·밸런스</button>
+    <button class="view-btn" data-view="league" onclick="switchView('league')">3. 리그전 기록</button>
+  </div>
+
+  <!-- ===== 팀 드래프트 ===== -->
+  <section id="view-draft" class="view">
+    <div class="card turn-card">
+      <div>
+        <div class="small muted" id="turnMode"></div>
+        <div class="turn-title" id="turnTitle"></div>
+        <div class="small muted" id="turnHint"></div>
+      </div>
+      <div class="summary" id="draftSummary"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="row">
+        <button class="outline sm" id="undoBtn" onclick="undoLastPick()">직전 선발 취소</button>
+        <button class="outline sm" onclick="autoAssignTopCaptains()">빈 팀 팀장 자동 추천</button>
+        <button class="outline sm" onclick="autoBalanceRemaining()">남은 인원 밸런스 배정</button>
+        <button class="outline sm" onclick="sendRemainingToRoles(false)">남은 인원 → 비선수</button>
+        <button class="danger sm" onclick="resetDraftOnly()">드래프트 초기화</button>
+      </div>
+      <div class="row">
+        <button class="sm" id="blindBtn" onclick="toggleBlind()"></button>
+        <button class="outline sm" id="recBtn" onclick="toggleRawRecord()"></button>
+        <button class="outline sm" onclick="shuffleAnonCodes()">익명코드 섞기</button>
+      </div>
+    </div>
+
+    <div class="team-grid" id="teamBoard"></div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>선발 대기 선수 <span class="small muted" id="poolCount"></span></span>
+        <div class="row">
+          <select id="poolStatus" onchange="ui.poolStatus=this.value; renderDraft()">
+            <option value="available">미선발만</option>
+            <option value="all">전체</option>
+          </select>
+          
+          <select id="poolSort" onchange="ui.poolSort=this.value; renderDraft()">
+            <option value="code">익명코드순</option>
+            <option value="cardio">심폐지구력순</option>
+            <option value="power">순발력순</option>
+            <option value="strength">근력순</option>
+            <option value="flex">유연성순</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="poolTable"></div>
+    </div>
+  </section>
+
+  <!-- ===== 비선수 역할 ===== -->
+  <section id="view-roles" class="view">
+    <div class="card">
+      <div class="card-title">
+        <span>비선수 역할 배정 <span class="small muted">(배정된 학생은 선수 후보에서 제외됩니다)</span></span>
+        <div class="row">
+          <button class="accent sm" onclick="sendRemainingToRoles(false)">미선발 → 순서대로 배정</button>
+          <button class="outline sm" onclick="sendRemainingToRoles(true)">미선발 → 랜덤 배정</button>
+          <button class="sm" onclick="openRoleEditor()">⚙ 역할 편집</button>
+          <button class="danger sm" onclick="clearAllRoles()">역할 전체 해제</button>
+        </div>
+      </div>
+      <div class="role-grid" id="roleBoard"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span>학생별 빠른 배정</span>
+        <select id="roleFilter" onchange="ui.roleFilter=this.value; renderRoles()">
+          <option value="unassigned">미선발 학생만</option>
+          <option value="all">전체 학생</option>
+        </select>
+      </div>
+      <div class="table-wrap" id="roleCandidates"></div>
+    </div>
+  </section>
+
+  <!-- ===== 선발 선수 능력치 ===== -->
+  <section id="view-stats" class="view">
+    <div class="card">
+      <div class="card-title">
+        <span>팀별 종합 능력치 <span class="small muted" id="statsBasis"></span></span>
+        <button class="outline sm" onclick="exportStats()">능력치표 엑셀 저장</button>
+      </div>
+      <div id="statsTop"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span>선발 선수 상세 <span class="small muted" id="statsCount"></span></span>
+        <div class="row">
+          <span class="seg" id="statsModeSeg"></span>
+          <select id="statsSort" onchange="ui.statsSort=this.value; renderStats()">
+            <option value="total">종합점수순</option>
+            <option value="cardio">심폐지구력순</option>
+            <option value="power">순발력순</option>
+            <option value="strength">근력순</option>
+            <option value="flex">유연성순</option>
+            <option value="bmi">BMI순</option>
+            <option value="num">번호순</option>
+            <option value="league">리그 공격포인트순</option>
+          </select>
+        </div>
+      </div>
+      <div id="statsPlayers"></div>
+    </div>
+  </section>
+
+  <!-- ===== 명단·PAPS ===== -->
+  <section id="view-roster" class="view">
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card" style="margin:0;">
+        <div class="card-title"><span>명단 불러오기</span></div>
+        <p class="small muted" style="margin-bottom:10px;">나이스에서 받은 <b>학급별건강체력평가조회.xlsx</b>를 수정 없이 그대로 올리면 됩니다. 인터넷이 안 되면 엑셀 내용을 복사해 붙여넣으세요.</p>
+        <div class="row">
+          <button class="accent sm" onclick="triggerExcelSelect()">엑셀 파일 선택</button>
+          <button class="outline sm" onclick="openPasteModal()">엑셀 붙여넣기</button>
+          <button class="outline sm" onclick="downloadSampleTemplate()">표준 양식 샘플</button>
+          <button class="outline sm" onclick="openAddStudentModal()">학생 개별 추가</button>
+        </div>
+      </div>
+      <div class="dropzone" id="dropZone" onclick="triggerExcelSelect()">
+        <div class="bold">여기에 엑셀 파일을 끌어다 놓으세요</div>
+        <div class="small">현재 학급에 덮어쓰거나 새 학급 탭으로 추가할 수 있습니다</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span id="rosterTitle">학생 명단</span>
+        <div class="row">
+          <input type="text" id="rosterSearch" placeholder="이름·번호 검색" oninput="ui.rosterQuery=this.value; renderRosterBody()">
+          <button class="danger sm" onclick="clearAllStudents()">명단 비우기</button>
+        </div>
+      </div>
+      <p class="small muted" style="margin-bottom:8px;">점수는 각 체력요인 0~20점, 교사 실기보정은 -20~+30점 권장. 종합 = PAPS 5개 요인 합 + 보정.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>번호</th><th>성명</th><th>익명코드</th><th>팀장</th>
+              <th>심폐지구력</th><th>유연성</th><th>근력·근지구력</th><th>순발력</th><th>비만(BMI)</th>
+              <th>실기보정</th><th>종합</th><th>등급</th><th>배정</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="rosterBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 팀 설정·밸런스 ===== -->
+  <section id="view-teams" class="view">
+    <div class="card">
+      <div class="card-title">
+        <span>능력치 계산 기준 (PAPS 종목별 가중치)</span>
+        <span class="small muted" id="weightNow"></span>
+      </div>
+      <p class="small muted" style="margin-bottom:10px;">종목에 중요한 체력요인의 비중을 높입니다. 가중치를 바꿔도 100점 만점으로 환산되며, PAPS 등급은 나이스 원점수 기준 그대로입니다. 0으로 두면 해당 요인은 빠집니다.</p>
+      <div class="row" id="presetBtns" style="margin-bottom:12px;"></div>
+      <div class="table-wrap" id="weightTable"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>팀 구성 설정</span><button class="accent sm" onclick="addTeam()">+ 팀 추가</button></div>
+        <div style="margin-bottom:14px;">
+          <div class="small bold" style="margin-bottom:6px;">지명 순서 방식</div>
+          <div class="row" id="modeBtns"></div>
+        </div>
+        <div id="teamConfigList"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>팀 간 밸런스</span><span class="small" id="balanceVerdict"></span></div>
+        <div class="table-wrap" id="balanceTable"></div>
+        <p class="small muted" style="margin-top:8px;">평균 종합점수 최대 편차 4.5점 이하: 균형 / 9점 이하: 양호 / 초과: 편차 주의</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 리그전 기록 ===== -->
+  <section id="view-league" class="view">
+    <div class="card">
+      <div class="card-title">
+        <span id="leagueTitle">리그 순위표</span>
+        <div class="row">
+          <span class="small muted">승 2점 · 무 1점 · 패 0점 / 동점 시 득실차 → 다득점</span>
+          <button class="accent sm" onclick="exportLeagueCSV()">생기부용 CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="standingsTable"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span>대진표 및 경기 기록</span>
+        <div class="row">
+          <span class="small muted" id="scheduleInfo"></span>
+          <button class="sm" onclick="openStatEditor()">⚙ 기록 항목 편집</button>
+        </div>
+      </div>
+      <div id="matchList"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>개인 누적 기록</span></div>
+      <div class="table-wrap" id="playerStatsTable"></div>
+    </div>
+  </section>
+</div>
+
+<div class="modal-back" id="modalBack" onclick="if(event.target===this) closeModal()">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+<div id="toast"></div>
+<div id="askBack" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1500; padding:16px;">
+  <div class="modal-box" style="max-width:420px; margin-top:18vh;">
+    <div id="askMsg" style="white-space:pre-line; line-height:1.6; margin-bottom:14px;"></div>
+    <input type="text" id="askInput" style="width:100%; display:none; margin-bottom:6px; padding:8px 10px; font-size:.95rem;">
+    <div class="modal-foot" style="margin-top:12px;">
+      <button class="outline" id="askNo">취소</button>
+      <button class="accent" id="askYes">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+ * 1. 상수 & 상태
+ * ========================================================= */
+const STORAGE_KEY = 'paps_team_league_v1';
+const OLD_STORAGE_KEY = 'paps_blind_draft_v5_clean_captain_roles'; // 이전 버전 데이터 자동 이전
+const TEAM_COLORS = ['#2563eb', '#0d9488', '#d97706', '#e11d48', '#7c3aed', '#475569'];
+// 기본 비선수 역할 (학급마다 [⚙ 역할 편집]에서 이름·정원·설명·생기부 문구 수정 가능)
+// quota: null = 인원 제한 없음(남은 인원이 자동 배정되는 역할)
+const DEFAULT_ROLES = [
+  { id: 'referee', name: '심판', quota: 2, desc: '경기 규칙 판정 및 진행',
+    comment: '리그전 심판을 맡아 경기 규칙을 정확히 적용하며 공정한 경기 운영에 기여함.' },
+  { id: 'scorer', name: '점수 집계', quota: 2, desc: '득점 기록 및 결과 집계',
+    comment: '리그전 점수 집계를 맡아 경기 기록을 꼼꼼하게 관리하며 원활한 리그 운영에 기여함.' },
+  { id: 'helper', name: '환경 도우미', quota: 1, desc: '용구 세팅·정리, 안전 관리',
+    comment: '환경 도우미로서 용구 준비와 정리, 안전한 경기 환경 조성에 앞장섬.' },
+  { id: 'cheer', name: '응원단', quota: null, desc: '나머지 인원, 팀 응원',
+    comment: '응원단으로 참여하여 적극적인 응원으로 경기 분위기를 활성화하고 페어플레이 문화 형성에 기여함.' }
+];
+function defaultRoles(quotas) {
+  return DEFAULT_ROLES.map(r => ({ ...r, quota: r.quota === null ? null : (quotas?.[r.id] ?? r.quota) }));
+}
+const cloneRoles = roles => roles.map(r => ({ ...r }));
+
+// 리그전 개인 기록 항목 (학급마다 [⚙ 기록 항목 편집]에서 수정 가능)
+// score: 팀 점수에 합산 / point: 공격포인트에 포함 / comment: 생기부 문구 ({n} = 누적 횟수)
+const DEFAULT_STAT_FIELDS = [
+  { id: 'goal', name: '득점', score: true, point: true, comment: '총 {n}득점을 기록하며 공간 침투와 정확한 캐치 능력을 발휘함' },
+  { id: 'assist', name: '어시스트', score: false, point: true, comment: '{n}회의 어시스트 패스로 득점 기회를 만들며 협력 플레이를 보여줌' },
+  { id: 'def', name: '수비', score: false, point: false, comment: '{n}회의 수비 성공으로 상대 패스 경로를 적극적으로 차단함' }
+];
+const defaultStatFields = () => DEFAULT_STAT_FIELDS.map(f => ({ ...f }));
+const statFields = (c = cls()) => c.statFields;
+const scoreFields = (c = cls()) => c.statFields.filter(f => f.score);
+const pointFields = (c = cls()) => c.statFields.filter(f => f.point);
+const sumFields = (obj, fields) => fields.reduce((a, f) => a + (Number(obj?.[f.id]) || 0), 0);
+
+// PAPS 종목별 가중치 (0이면 계산에서 제외)
+const WEIGHT_KEYS = [['cardio', '심폐지구력'], ['power', '순발력'], ['strength', '근력·근지구력'], ['flex', '유연성'], ['bmi', '비만(BMI)']];
+const DEFAULT_WEIGHTS = { cardio: 1, power: 1, strength: 1, flex: 1, bmi: 1 };
+const WEIGHT_PRESETS = {
+  equal:     { name: '균등 (PAPS 그대로)',   w: { cardio: 1, power: 1, strength: 1, flex: 1, bmi: 1 },     why: '5개 요인을 똑같이 반영' },
+  ultimate:  { name: '플라잉디스크·얼티미트', w: { cardio: 3, power: 2, strength: 1, flex: 0.5, bmi: 0.5 }, why: '계속 뛰는 경기 → 심폐 최우선, 컷·스프린트 → 순발력' },
+  basketball:{ name: '농구',                 w: { cardio: 2, power: 3, strength: 1.5, flex: 0.5, bmi: 0.5 }, why: '점프·방향전환 → 순발력 최우선, 몸싸움 → 근력' },
+  net:       { name: '배드민턴·배구',         w: { cardio: 2, power: 3, strength: 1, flex: 1, bmi: 0.5 },   why: '순간 반응·점프 → 순발력, 랠리 → 심폐' }
+};
+
+let appState = null;
+const ui = { poolStatus: 'available', poolSort: 'code', rosterQuery: '', roleFilter: 'unassigned', statsMode: 'team', statsSort: 'total' };
+
+function createEmptyClass(id, name) {
+  return {
+    id: id || ('class_' + Date.now()),
+    name: name || '새 학급',
+    draftOrderMode: 'snake',
+    manualTargetTeamId: 't_1',
+    pickHistory: [],
+    roles: defaultRoles(),
+    statFields: defaultStatFields(),
+    weights: { ...WEIGHT_PRESETS.ultimate.w },
+    teams: [
+      { id: 't_1', name: '1팀', colorIdx: 0 },
+      { id: 't_2', name: '2팀', colorIdx: 1 },
+      { id: 't_3', name: '3팀', colorIdx: 2 },
+      { id: 't_4', name: '4팀', colorIdx: 3 }
+    ],
+    students: [],
+    matches: {}
+  };
+}
+
+function createDefaultState() {
+  return {
+    blindMode: true,
+    showRawRecord: true,
+    activeView: 'draft',
+    activeClassId: 'class_default',
+    classes: [createEmptyClass('class_default', '학급 1 (엑셀 업로드 대기)')]
+  };
+}
+
+function normalizeState(s) {
+  if (!s.activeView) s.activeView = 'draft';
+  s.classes.forEach(c => {
+    // 이전 버전(고정 역할 + roleQuotas) 데이터 → 학급별 역할 목록으로 이전
+    if (!Array.isArray(c.roles)) c.roles = defaultRoles(c.roleQuotas);
+    delete c.roleQuotas;
+    if (!Array.isArray(c.statFields)) c.statFields = defaultStatFields();
+    (c.students || []).forEach(st => { if (st.nonPlayerRole && !c.roles.some(r => r.id === st.nonPlayerRole)) { st.nonPlayerRole = null; st.cheerTeamId = null; } });
+    if (!c.pickHistory) c.pickHistory = [];
+    if (!c.matches) c.matches = {};
+    if (!c.weights) c.weights = { ...WEIGHT_PRESETS.ultimate.w };
+    if (!c.teams) c.teams = createEmptyClass().teams;
+    if (!c.students) c.students = [];
+  });
+  if (!s.classes.find(c => c.id === s.activeClassId)) s.activeClassId = s.classes[0].id;
+  return s;
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.classes) && parsed.classes.length) {
+        appState = normalizeState(parsed);
+        saveState();
+        return;
+      }
+    }
+  } catch (e) { console.warn('저장 데이터 불러오기 실패', e); }
+  appState = createDefaultState();
+  saveState();
+}
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appState)); }
+  catch (e) { toast('브라우저 저장 공간 오류: 백업 파일을 내려받아 두세요.', true); }
+}
+
+const cls = () => appState.classes.find(c => c.id === appState.activeClassId) || appState.classes[0];
+
+/* =========================================================
+ * 2. 계산 & 표시 유틸
+ * ========================================================= */
+// 나이스 원점수 합계 (PAPS 등급 산정용, 0~100)
+const papsRaw = s => Number(s.cardio || 0) + Number(s.flex || 0) + Number(s.strength || 0) + Number(s.power || 0) + Number(s.bmi || 0);
+// 종목별 가중치를 적용한 PAPS 점수 (100점 만점으로 환산 → 등급 기준과 비교 가능)
+function papsScore(s) {
+  const w = cls().weights || DEFAULT_WEIGHTS;
+  const sumW = WEIGHT_KEYS.reduce((a, [k]) => a + (Number(w[k]) || 0), 0);
+  if (!sumW) return 0;
+  const v = WEIGHT_KEYS.reduce((a, [k]) => a + (Number(w[k]) || 0) * Number(s[k] || 0), 0) * 5 / sumW;
+  return Math.round(v * 10) / 10;
+}
+const totalScore = s => Math.round((papsScore(s) + Number(s.bonus || 0)) * 10) / 10;
+function presetIdOf(w) {
+  return Object.keys(WEIGHT_PRESETS).find(id => WEIGHT_KEYS.every(([k]) => Number(WEIGHT_PRESETS[id].w[k]) === Number(w?.[k]))) || 'custom';
+}
+const presetName = c => { const id = presetIdOf(c.weights); return id === 'custom' ? '사용자 지정 가중치' : WEIGHT_PRESETS[id].name; };
+function gradeOf(score) {
+  if (score >= 80) return 1;
+  if (score >= 60) return 2;
+  if (score >= 40) return 3;
+  if (score >= 20) return 4;
+  return 5;
+}
+const gradeBadge = g => `<span class="grade g${Math.min(g, 4)}">${g}등급</span>`;
+const codeOf = s => '#' + String(s.anonCode).padStart(2, '0');
+// 팀장은 블라인드 모드에서도 실명 표시 (팀장 선발·호명이 쉽도록)
+const dispName = s => (appState.blindMode && !s.isCaptain) ? `Player ${codeOf(s)}` : `${s.num}번 ${esc(s.name)}`;
+const realName = s => `${s.num}번 ${esc(s.name)}`;
+const teamColor = t => TEAM_COLORS[(t.colorIdx || 0) % TEAM_COLORS.length];
+const roleOf = (id, c = cls()) => (c.roles || []).find(r => r.id === id);
+const roleName = id => roleOf(id)?.name || '';
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function shuffleArr(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function toast(msg, isErr) {
+  const el = document.createElement('div');
+  el.className = 'toast-item' + (isErr ? ' err' : '');
+  el.textContent = msg;
+  const box = document.getElementById('toast');
+  box.appendChild(el);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2400);
+}
+// 화면 안 확인/입력 창: await askConfirm('메시지') → true/false, await askPrompt('메시지', '기본값') → 문자열/null
+function askDialog(msg, withInput, def) {
+  return new Promise(resolve => {
+    const back = document.getElementById('askBack'), inp = document.getElementById('askInput');
+    document.getElementById('askMsg').textContent = msg;
+    inp.style.display = withInput ? 'block' : 'none';
+    inp.value = def ?? '';
+    back.style.display = 'block';
+    const yes = document.getElementById('askYes'), no = document.getElementById('askNo');
+    const done = v => { back.style.display = 'none'; yes.onclick = no.onclick = back.onclick = inp.onkeydown = back.onkeydown = null; resolve(v); };
+    yes.onclick = () => done(withInput ? inp.value : true);
+    no.onclick = () => done(withInput ? null : false);
+    back.onclick = e => { if (e.target === back) no.onclick(); };
+    back.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); no.onclick(); } else if (e.key === 'Enter') { e.preventDefault(); yes.onclick(); } };
+    back.tabIndex = -1;
+    setTimeout(() => (withInput ? (inp.focus(), inp.select()) : yes.focus()), 0);
+  });
+}
+const askConfirm = msg => askDialog(msg, false);
+const askPrompt = (msg, def) => askDialog(msg, true, def);
+
+function openModal(html, wide) {
+  const box = document.getElementById('modalBox');
+  box.className = 'modal-box' + (wide ? ' wide' : '');
+  box.innerHTML = html;
+  document.getElementById('modalBack').style.display = 'block';
+}
+function closeModal() { document.getElementById('modalBack').style.display = 'none'; }
+let downloadsApi = null;
+try { window.claude?.use?.('downloads')?.then(d => { downloadsApi = d; }).catch(() => {}); } catch (e) {}
+async function download(filename, content, type) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
+  if (downloadsApi) {
+    try { await downloadsApi.save({ filename, data: blob }); toast(`저장했습니다: ${filename}`); }
+    catch (e) { if (e?.code !== 'declined') toast(`파일을 저장하지 못했습니다 (${e?.code || '오류'})`, true); }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const today = () => new Date().toISOString().slice(0, 10);
+const safeFile = s => String(s).replace(/[\\/:*?"<>|]/g, '_');
+
+/* =========================================================
+ * 3. 나이스 엑셀 파서 (기존 로직 유지)
+ * ========================================================= */
+function parseSheetRowsToStudents(rows) {
+  let detectedClassName = '';
+  let isNeisFormat = false;
+
+  for (let r = 0; r < Math.min(rows.length, 15); r++) {
+    const rowStr = (rows[r] || []).join(' ').replace(/\s+/g, ' ').trim();
+    if (rowStr.includes('건강체력평가') || rowStr.includes('심폐지구력')) isNeisFormat = true;
+    const m = rowStr.match(/(\d+)\s*학년\s*(\d+)\s*반/);
+    if (m && !detectedClassName) detectedClassName = `${m[1]}학년 ${m[2]}반`;
+  }
+
+  let headerRowIdx = -1, colMap = null;
+  for (let r = 0; r < Math.min(rows.length, 20); r++) {
+    const row = rows[r] || [];
+    const nextRow = rows[r + 1] || [];
+    const joined = row.map(c => String(c || '').trim()).join('|');
+    const nextJoined = nextRow.map(c => String(c || '').replace(/\s+/g, '')).join('|');
+    // 나이스 양식은 2줄 헤더(아랫줄에 '점수'·'등급')가 있음 → 없으면 일반 양식으로 처리
+    if (joined.includes('번호') && joined.includes('성명') && (joined.includes('심폐지구력') || joined.includes('건강체력평가')) && nextJoined.includes('점수')) {
+      isNeisFormat = true;
+      headerRowIdx = r;
+      const numCol = row.findIndex(c => String(c || '').trim() === '번호');
+      const nameCol = row.findIndex(c => String(c || '').trim() === '성명');
+      const totalStart = row.findIndex(c => String(c || '').includes('건강체력평가'));
+      const cardioStart = row.findIndex(c => String(c || '').includes('심폐지구력'));
+      const flexStart = row.findIndex(c => String(c || '').includes('유연성'));
+      const strengthStart = row.findIndex(c => String(c || '').includes('근력'));
+      const powerStart = row.findIndex(c => String(c || '').includes('순발력'));
+      const bmiStart = row.findIndex(c => String(c || '').includes('비만'));
+      const sub = (s, e, kw, def) => {
+        if (s < 0) return def;
+        const lim = e > s ? e : nextRow.length;
+        for (let c = s; c < lim; c++) if (String(nextRow[c] || '').replace(/\s+/g, '').includes(kw)) return c;
+        return def;
+      };
+      colMap = {
+        numCol: numCol >= 0 ? numCol : 1,
+        nameCol: nameCol >= 0 ? nameCol : 2,
+        cardioRecCols: [cardioStart, cardioStart + 1, cardioStart + 2].filter(i => i >= 0),
+        cardioScoreCol: sub(cardioStart, flexStart, '점수', 8),
+        flexRecCols: [flexStart, flexStart + 2].filter(i => i >= 0),
+        flexScoreCol: sub(flexStart, strengthStart, '점수', 14),
+        strengthRecCols: [strengthStart, strengthStart + 1, strengthStart + 2].filter(i => i >= 0),
+        strengthScoreCol: sub(strengthStart, powerStart, '점수', 21),
+        powerRecCols: [powerStart, powerStart + 1].filter(i => i >= 0),
+        powerScoreCol: sub(powerStart, bmiStart, '점수', 26),
+        bmiValCol: bmiStart >= 0 ? bmiStart : 29,
+        bmiScoreCol: sub(bmiStart, nextRow.length, '점수', 30),
+        bmiStatusCol: sub(bmiStart, nextRow.length, '등급', 31)
+      };
+      break;
+    }
+  }
+
+  const toNum = (v, def = 0) => {
+    if (v === null || v === undefined || String(v).trim() === '') return def;
+    const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+    return isNaN(n) ? def : n;
+  };
+  const clamp20 = v => Math.min(20, Math.max(0, v));
+  const firstNonEmpty = (row, cols) => {
+    for (const c of cols) if (c >= 0 && row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '') return toNum(row[c], '');
+    return '';
+  };
+
+  const out = [];
+  if (colMap) {
+    for (let r = headerRowIdx + 2; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || !row.length) continue;
+      const rawNum = String(row[colMap.numCol] ?? '').trim();
+      const rawName = String(row[colMap.nameCol] ?? '').trim();
+      if (!/^\d+(\.0)?$/.test(rawNum)) continue;
+      if (!rawName || rawName === '성명' || rawName === '이름') continue;
+      out.push({
+        num: parseInt(parseFloat(rawNum), 10), name: rawName,
+        cardioRec: firstNonEmpty(row, colMap.cardioRecCols), cardio: clamp20(toNum(row[colMap.cardioScoreCol], 0)),
+        flexRec: firstNonEmpty(row, colMap.flexRecCols), flex: clamp20(toNum(row[colMap.flexScoreCol], 0)),
+        strengthRec: firstNonEmpty(row, colMap.strengthRecCols), strength: clamp20(toNum(row[colMap.strengthScoreCol], 0)),
+        powerRec: firstNonEmpty(row, colMap.powerRecCols), power: clamp20(toNum(row[colMap.powerScoreCol], 0)),
+        bmiVal: toNum(row[colMap.bmiValCol], ''), bmi: clamp20(toNum(row[colMap.bmiScoreCol], 0)),
+        bmiStatus: String(row[colMap.bmiStatusCol] || '정상').trim(),
+        bonus: 0, isCaptain: false
+      });
+    }
+  } else {
+    let h = -1;
+    for (let r = 0; r < Math.min(rows.length, 15); r++) {
+      const s = (rows[r] || []).join('|');
+      if (s.includes('이름') || s.includes('성명')) { h = r; break; }
+    }
+    if (h >= 0) {
+      const headers = (rows[h] || []).map(x => String(x || '').trim());
+      const find = keys => headers.findIndex(x => keys.some(k => x.includes(k)));
+      const cNum = find(['번호', '출석']), cName = find(['이름', '성명', '학생']);
+      const cCardio = find(['심폐', '지구력', '오래달리기']), cFlex = find(['유연', '굽히기']);
+      const cStr = find(['근력', '악력', '윗몸']), cPow = find(['순발', '멀리뛰기', '50m']);
+      const cBmi = find(['BMI', '비만', '체질량']), cBonus = find(['보정', '실기', '수행']), cCap = find(['팀장', '주장']);
+      for (let r = h + 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row) continue;
+        const name = cName >= 0 ? String(row[cName] || '').trim() : '';
+        if (!name || name === '이름' || name === '성명') continue;
+        out.push({
+          num: cNum >= 0 ? toNum(row[cNum], out.length + 1) : out.length + 1, name,
+          cardio: cCardio >= 0 ? clamp20(toNum(row[cCardio], 12)) : 12,
+          flex: cFlex >= 0 ? clamp20(toNum(row[cFlex], 12)) : 12,
+          strength: cStr >= 0 ? clamp20(toNum(row[cStr], 12)) : 12,
+          power: cPow >= 0 ? clamp20(toNum(row[cPow], 12)) : 12,
+          bmi: cBmi >= 0 ? clamp20(toNum(row[cBmi], 14)) : 14,
+          bonus: cBonus >= 0 ? toNum(row[cBonus], 0) : 0,
+          isCaptain: cCap >= 0 ? ['O', 'o', 'Y', 'y', '1', '팀장', 'true'].includes(String(row[cCap]).trim()) : false
+        });
+      }
+    }
+  }
+  return { students: out, detectedClassName, isNeisFormat };
+}
+
+function convertRawListToStudents(list) {
+  const codes = shuffleArr(Array.from({ length: list.length }, (_, i) => i + 1));
+  return list.map((s, i) => ({
+    id: 'stu_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2, 6),
+    num: s.num, name: s.name, anonCode: codes[i],
+    cardio: Number(s.cardio ?? 0), cardioRec: s.cardioRec ?? '',
+    flex: Number(s.flex ?? 0), flexRec: s.flexRec ?? '',
+    strength: Number(s.strength ?? 0), strengthRec: s.strengthRec ?? '',
+    power: Number(s.power ?? 0), powerRec: s.powerRec ?? '',
+    bmi: Number(s.bmi ?? 0), bmiVal: s.bmiVal ?? '', bmiStatus: s.bmiStatus ?? '정상',
+    bonus: Number(s.bonus ?? 0), isCaptain: Boolean(s.isCaptain),
+    teamId: null, nonPlayerRole: null, cheerTeamId: null
+  }));
+}
+
+function triggerExcelSelect() {
+  const input = document.getElementById('excelInput');
+  input.value = '';
+  input.click();
+}
+function handleExcelUpload(e) {
+  const f = e.target.files[0];
+  if (f) processExcelFile(f);
+}
+function processExcelFile(file) {
+  if (typeof XLSX === 'undefined') {
+    toast('엑셀 라이브러리를 불러오지 못했습니다(인터넷 확인). [엑셀 붙여넣기]를 이용하세요.', true);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      const result = parseSheetRowsToStudents(rows);
+      if (!result.students.length) { toast('엑셀에서 학생 명단(번호/성명)을 찾지 못했습니다.', true); return; }
+      applyImportedStudents(result.students, result.detectedClassName || file.name.replace(/\.[^/.]+$/, ''));
+    } catch (err) {
+      console.error(err);
+      toast('엑셀 분석 중 오류가 발생했습니다. [엑셀 붙여넣기]를 이용해 보세요.', true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function applyImportedStudents(raw, suggested) {
+  const c = cls();
+  const list = convertRawListToStudents(raw);
+  let capIdx = 0;
+  list.forEach(s => { if (s.isCaptain && c.teams[capIdx]) { s.teamId = c.teams[capIdx].id; capIdx++; } else s.isCaptain = false; });
+  const newName = `${suggested || '새 학급'}`;
+
+  const overwrite = () => {
+    c.students = list; c.pickHistory = []; c.matches = {}; c.name = newName;
+    closeModal(); saveState(); renderAll();
+    toast(`${c.name} 명단 ${list.length}명을 불러왔습니다.`);
+  };
+  const addNew = () => {
+    const n = createEmptyClass('class_' + Date.now(), newName);
+    n.students = list;
+    let ci = 0; list.forEach(s => { if (s.isCaptain && n.teams[ci]) { s.teamId = n.teams[ci].id; ci++; } });
+    appState.classes.push(n); appState.activeClassId = n.id;
+    closeModal(); saveState(); renderAll();
+    toast(`새 학급 탭 [${newName}]이 추가되었습니다.`);
+  };
+
+  if (!c.students.length) { overwrite(); return; }
+  openModal(`
+    <div class="modal-head"><h3>명단 ${list.length}명 인식 완료</h3><button class="outline sm" onclick="closeModal()">닫기</button></div>
+    <p class="small muted" style="margin-bottom:12px;">감지된 학급: <b>${esc(newName)}</b></p>
+    <div style="display:grid; gap:8px;">
+      <button class="accent" id="impNew">새 학급 탭으로 추가</button>
+      <button class="outline" id="impOver">현재 탭 [${esc(c.name)}]에 덮어쓰기 (기존 팀·경기 기록 삭제)</button>
+    </div>`);
+  document.getElementById('impNew').onclick = addNew;
+  document.getElementById('impOver').onclick = overwrite;
+}
+
+function openPasteModal() {
+  openModal(`
+    <div class="modal-head"><h3>엑셀 붙여넣기</h3><button class="outline sm" onclick="closeModal()">닫기</button></div>
+    <p class="small muted" style="margin-bottom:8px;">엑셀에서 Ctrl+A → Ctrl+C 후 아래에 Ctrl+V 하세요.</p>
+    <textarea id="pasteArea" rows="10" style="width:100%; font-family:monospace; font-size:.8rem;"></textarea>
+    <div class="modal-foot">
+      <button class="outline" onclick="closeModal()">취소</button>
+      <button class="accent" onclick="processPasted()">반영하기</button>
+    </div>`, true);
+  setTimeout(() => document.getElementById('pasteArea').focus(), 50);
+}
+function processPasted() {
+  const text = document.getElementById('pasteArea').value.trim();
+  if (!text) { toast('붙여넣은 내용이 없습니다.', true); return; }
+  const rows = text.split(/\r?\n/).map(l => l.split('\t'));
+  const result = parseSheetRowsToStudents(rows);
+  if (!result.students.length) { toast('학생 데이터를 찾지 못했습니다.', true); return; }
+  closeModal();
+  applyImportedStudents(result.students, result.detectedClassName || '붙여넣은 학급');
+}
+
+function setupDragAndDrop() {
+  const dz = document.getElementById('dropZone');
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => { const f = e.dataTransfer?.files?.[0]; if (f) processExcelFile(f); });
+}
+
+/* =========================================================
+ * 4. 공통 렌더링
+ * ========================================================= */
+function renderAll() {
+  renderClassTabs();
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === appState.activeView));
+  document.querySelectorAll('.view').forEach(v => v.style.display = (v.id === 'view-' + appState.activeView) ? 'block' : 'none');
+  const map = { draft: renderDraft, roles: renderRoles, stats: renderStats, roster: renderRoster, teams: renderTeams, league: renderLeague };
+  (map[appState.activeView] || renderDraft)();
+}
+
+function renderClassTabs() {
+  const el = document.getElementById('classTabs');
+  el.innerHTML = appState.classes.map(c => `
+    <button class="tab-btn ${c.id === appState.activeClassId ? 'active' : ''}" onclick="selectClass('${c.id}')" ondblclick="renameClass('${c.id}')" title="더블클릭: 이름 변경">
+      ${esc(c.name)}<span class="cnt">${c.students.length}명</span>
+    </button>`).join('') + `
+    <button class="tab-btn tab-add" onclick="addClass()">+ 학급 추가</button>
+    <button class="link small" onclick="renameClass('${cls().id}')">이름 변경</button>
+    ${appState.classes.length > 1 ? `<button class="link small" onclick="deleteClass('${cls().id}')">현재 학급 삭제</button>` : ''}`;
+}
+
+function switchView(v) { appState.activeView = v; saveState(); renderAll(); }
+function selectClass(id) { appState.activeClassId = id; saveState(); renderAll(); }
+async function addClass() {
+  const name = await askPrompt('새 학급(수업) 이름', `학급 ${appState.classes.length + 1}`);
+  if (name === null) return;
+  const n = createEmptyClass('class_' + Date.now(), name.trim() || `학급 ${appState.classes.length + 1}`);
+  appState.classes.push(n); appState.activeClassId = n.id;
+  saveState(); renderAll();
+}
+async function renameClass(id) {
+  const c = appState.classes.find(x => x.id === id);
+  const name = await askPrompt('학급 이름 변경', c.name);
+  if (name && name.trim()) { c.name = name.trim(); saveState(); renderAll(); }
+}
+async function deleteClass(id) {
+  const c = appState.classes.find(x => x.id === id);
+  if (appState.classes.length <= 1 || !await askConfirm(`[${c.name}] 학급과 모든 기록을 삭제할까요?`)) return;
+  appState.classes = appState.classes.filter(x => x.id !== id);
+  appState.activeClassId = appState.classes[0].id;
+  saveState(); renderAll();
+}
+
+/* =========================================================
+ * 5. 팀 드래프트
+ * ========================================================= */
+function getTurn(c) {
+  if (!c.teams.length) return null;
+  if (c.draftOrderMode === 'manual') {
+    return { team: c.teams.find(t => t.id === c.manualTargetTeamId) || c.teams[0] };
+  }
+  const n = c.students.filter(s => s.teamId && !s.isCaptain).length;
+  const k = c.teams.length;
+  const round = Math.floor(n / k), pos = n % k;
+  const idx = round % 2 === 0 ? pos : k - 1 - pos;
+  return { team: c.teams[idx], round: round + 1, pick: pos + 1 };
+}
+
+function renderDraft() {
+  const c = cls();
+  const total = c.students.length;
+  const avail = c.students.filter(s => !s.teamId && !s.nonPlayerRole);
+  const roleCnt = c.students.filter(s => s.nonPlayerRole).length;
+  const avg = total ? (c.students.reduce((a, s) => a + totalScore(s), 0) / total).toFixed(1) : '0.0';
+  const turn = getTurn(c);
+
+  document.getElementById('draftSummary').innerHTML = `
+    <div><b>${total}</b><span>총원</span></div>
+    <div><b style="color:var(--accent)">${avail.length}</b><span>미선발</span></div>
+    <div><b>${roleCnt}</b><span>비선수</span></div>
+`;
+
+  const tm = document.getElementById('turnMode'), tt = document.getElementById('turnTitle'), th = document.getElementById('turnHint');
+  tm.textContent = (c.draftOrderMode === 'snake' ? '스네이크 드래프트 (1→2→3→4 → 4→3→2→1)' : '수동 지명 (팀 카드를 눌러 지명할 팀 선택)') + ` · 능력치 기준: ${presetName(c)}`;
+  if (!total) { tt.textContent = '나이스 PAPS 엑셀을 업로드하세요'; th.textContent = '상단 [나이스 엑셀 업로드] 또는 [명단·PAPS 관리] 탭에서 불러올 수 있습니다.'; }
+  else if (!avail.length) { tt.textContent = '모든 학생 배정 완료'; th.textContent = '익명 모드를 끄면 실명이 공개됩니다. 이어서 [3. 리그전 기록]으로 이동하세요.'; }
+  else if (turn) {
+    tt.textContent = c.draftOrderMode === 'snake' ? `${turn.team.name} 지명 차례 · ${turn.round}라운드 ${turn.pick}픽` : `${turn.team.name}에 지명 중`;
+    th.textContent = '아래 표에서 [선발]을 누르면 현재 차례 팀으로 들어갑니다. 팀장은 순번 계산에서 제외됩니다.';
+  }
+
+  document.getElementById('undoBtn').disabled = !c.pickHistory.length;
+  const bb = document.getElementById('blindBtn');
+  bb.textContent = appState.blindMode ? '익명 모드 ON' : '실명 공개 중';
+  bb.className = 'sm ' + (appState.blindMode ? '' : 'danger');
+  document.getElementById('recBtn').textContent = appState.showRawRecord ? '실측기록 표시 ON' : '실측기록 숨김';
+
+  // 팀 카드
+  const activeId = avail.length ? turn?.team?.id : null;
+  const candidates = c.students.filter(s => !s.nonPlayerRole).sort((a, b) => a.num - b.num);
+  document.getElementById('teamBoard').innerHTML = c.teams.map(t => {
+    const members = c.students.filter(s => s.teamId === t.id);
+    const cap = members.find(s => s.isCaptain);
+    const regs = members.filter(s => !s.isCaptain);
+    const tAvg = members.length ? (members.reduce((a, s) => a + totalScore(s), 0) / members.length).toFixed(1) : '-';
+    return `
+      <div class="team-card ${activeId === t.id ? 'turn' : ''}" style="--c:${teamColor(t)}" onclick="selectManualTeam('${t.id}')">
+        <div class="team-head">
+          <span><span class="team-name">${esc(t.name)}</span>${activeId === t.id ? '<span class="turn-tag">지명 차례</span>' : ''}</span>
+          <span class="small muted">${members.length}명</span>
+        </div>
+        <div class="cap-line" onclick="event.stopPropagation()">
+          팀장: <b>${cap ? dispName(cap) : '<span class="muted">미지정</span>'}</b>
+          <select onchange="assignCaptainFromSlot('${t.id}', this.value)">
+            <option value="">${cap ? '— 팀장 해제 —' : '팀장 선택...'}</option>
+            ${candidates.map(s => `<option value="${s.id}" ${cap?.id === s.id ? 'selected' : ''}>${s.num}번 ${esc(s.name)}</option>`).join('')}
+          </select>
+        </div>
+        ${regs.length ? regs.map(m => `
+          <div class="member">
+            <span>${dispName(m)}</span>
+            <span class="row" style="gap:4px;">
+              <button class="link" title="팀장으로 지정" onclick="event.stopPropagation(); assignCaptain('${m.id}', '${t.id}')">👑</button>
+              <button class="link" title="선발 해제" onclick="event.stopPropagation(); unassignStudent('${m.id}')">✕</button>
+            </span>
+          </div>`).join('') : '<div class="empty">선발된 팀원 없음</div>'}
+      </div>`;
+  }).join('');
+
+  // 선수 풀
+  ['poolStatus', 'poolSort'].forEach(k => document.getElementById(k).value = ui[k]);
+  let pool = c.students.slice();
+  if (ui.poolStatus === 'available') pool = pool.filter(s => !s.teamId && !s.nonPlayerRole);
+  const sorters = {
+    code: (a, b) => a.anonCode - b.anonCode,
+    totalDesc: (a, b) => totalScore(b) - totalScore(a),
+    totalAsc: (a, b) => totalScore(a) - totalScore(b),
+    cardio: (a, b) => b.cardio - a.cardio, power: (a, b) => b.power - a.power,
+    strength: (a, b) => b.strength - a.strength, flex: (a, b) => b.flex - a.flex
+  };
+  pool.sort(sorters[ui.poolSort] || sorters.code);
+  document.getElementById('poolCount').textContent = `(${pool.length}명)`;
+
+  const wrap = document.getElementById('poolTable');
+  if (!total) { wrap.innerHTML = '<div class="empty">업로드된 명단이 없습니다.</div>'; return; }
+  if (!pool.length) { wrap.innerHTML = '<div class="empty">조건에 맞는 학생이 없습니다.</div>'; return; }
+  const rec = (v, unit) => appState.showRawRecord && v !== '' && v !== undefined ? ` <span class="rec">${v}${unit}</span>` : '';
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>선수</th><th>심폐지구력</th><th>순발력</th><th>근력</th><th>유연성</th><th>BMI</th><th>보정</th><th>선발</th>
+      </tr></thead>
+      <tbody>
+        ${pool.map(s => {
+          const team = c.teams.find(t => t.id === s.teamId);
+          const assigned = team || s.nonPlayerRole;
+          return `
+          <tr class="${assigned ? 'dim' : ''}">
+            <td class="left"><b>${dispName(s)}</b>${!appState.blindMode || s.isCaptain ? ` <span class="rec">${codeOf(s)}</span>` : ''}${s.isCaptain ? ' 👑 팀장' : ''}</td>
+            <td>${s.cardio}${rec(s.cardioRec, '회')}</td>
+            <td>${s.power}${rec(s.powerRec, 'cm')}</td>
+            <td>${s.strength}${rec(s.strengthRec, 'kg')}</td>
+            <td>${s.flex}${rec(s.flexRec, 'cm')}</td>
+            <td>${s.bmi}</td>
+            <td>${s.bonus ? (s.bonus > 0 ? '+' : '') + s.bonus : '-'}</td>
+            <td>
+              ${team ? `<span class="small">${esc(team.name)}${s.isCaptain ? ' 팀장' : ''}</span> <button class="link" onclick="unassignStudent('${s.id}')">취소</button>`
+              : s.nonPlayerRole ? `<span class="small">${roleName(s.nonPlayerRole)}</span> <button class="link" onclick="assignRole('${s.id}', null)">해제</button>`
+              : `<div class="row" style="justify-content:center; gap:4px;">
+                  <button class="accent sm" onclick="draftPick('${s.id}')">선발</button>
+                  <button class="outline sm" onclick="assignCaptain('${s.id}')">팀장</button>
+                  <select onchange="quickAssign('${s.id}', this.value)" style="font-size:.78rem;">
+                    <option value="">지정...</option>
+                    <optgroup label="팀원">${c.teams.map(t => `<option value="team:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>
+                    <optgroup label="팀장">${c.teams.map(t => `<option value="cap:${t.id}">${esc(t.name)} 팀장</option>`).join('')}</optgroup>
+                    <optgroup label="비선수">${c.roles.map(r => `<option value="role:${r.id}">${esc(r.name)}</option>`).join('')}</optgroup>
+                  </select>
+                </div>`}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function quickAssign(id, v) {
+  if (!v) return;
+  if (v.startsWith('cap:')) assignCaptain(id, v.slice(4));
+  else if (v.startsWith('team:')) draftPick(id, v.slice(5));
+  else if (v.startsWith('role:')) assignRole(id, v.slice(5));
+}
+
+function assignCaptain(studentId, targetTeamId = null) {
+  const c = cls();
+  const st = c.students.find(s => s.id === studentId);
+  if (!st) return;
+  if (st.isCaptain && !targetTeamId) {
+    st.isCaptain = false; st.teamId = null;
+    saveState(); renderAll(); toast('팀장 지정이 해제되었습니다.');
+    return;
+  }
+  let dest = targetTeamId ? c.teams.find(t => t.id === targetTeamId)
+    : st.teamId ? c.teams.find(t => t.id === st.teamId)
+    : c.teams.find(t => !c.students.some(s => s.teamId === t.id && s.isCaptain)) || c.teams[0];
+  if (!dest) { toast('팀을 먼저 추가하세요.', true); return; }
+  c.students.forEach(o => { if (o.id !== st.id && o.teamId === dest.id && o.isCaptain) o.isCaptain = false; });
+  st.nonPlayerRole = null; st.cheerTeamId = null; st.isCaptain = true; st.teamId = dest.id;
+  c.pickHistory = c.pickHistory.filter(h => h.studentId !== st.id);
+  saveState(); renderAll();
+  toast(`${st.num}번 ${st.name} → ${dest.name} 팀장`);
+}
+
+function assignCaptainFromSlot(teamId, studentId) {
+  const c = cls();
+  if (!studentId) {
+    c.students.forEach(s => { if (s.teamId === teamId && s.isCaptain) { s.isCaptain = false; s.teamId = null; } });
+    saveState(); renderAll(); return;
+  }
+  assignCaptain(studentId, teamId);
+}
+
+function draftPick(studentId, explicitTeamId = null) {
+  const c = cls();
+  const st = c.students.find(s => s.id === studentId);
+  if (!st) return;
+  const teamId = explicitTeamId || getTurn(c)?.team?.id;
+  if (!teamId) return;
+  st.nonPlayerRole = null; st.cheerTeamId = null; st.isCaptain = false; st.teamId = teamId;
+  c.pickHistory.push({ studentId: st.id, teamId });
+  saveState(); renderAll();
+  toast(`${appState.blindMode ? 'Player ' + codeOf(st) : st.name} → ${c.teams.find(t => t.id === teamId)?.name}`);
+}
+
+function unassignStudent(id) {
+  const c = cls();
+  const st = c.students.find(s => s.id === id);
+  if (!st) return;
+  st.teamId = null; st.isCaptain = false;
+  c.pickHistory = c.pickHistory.filter(h => h.studentId !== id);
+  saveState(); renderAll();
+}
+
+function undoLastPick() {
+  const c = cls();
+  const last = c.pickHistory.pop();
+  if (!last) return;
+  const st = c.students.find(s => s.id === last.studentId);
+  if (st && !st.isCaptain) st.teamId = null;
+  saveState(); renderAll(); toast('직전 선발을 취소했습니다.');
+}
+
+function autoAssignTopCaptains() {
+  const c = cls();
+  const avail = c.students.filter(s => !s.teamId && !s.nonPlayerRole).sort((a, b) => totalScore(b) - totalScore(a));
+  let n = 0;
+  c.teams.forEach(t => {
+    if (!c.students.some(s => s.teamId === t.id && s.isCaptain) && avail.length) {
+      const top = avail.shift(); top.isCaptain = true; top.teamId = t.id; n++;
+    }
+  });
+  saveState(); renderAll();
+  toast(n ? `${n}개 팀에 능력치 상위 학생을 팀장으로 배치했습니다.` : '모든 팀에 팀장이 있거나 대기 학생이 없습니다.');
+}
+
+function autoBalanceRemaining() {
+  const c = cls();
+  const rem = c.students.filter(s => !s.teamId && !s.nonPlayerRole).sort((a, b) => totalScore(b) - totalScore(a));
+  if (!rem.length) { toast('미선발 학생이 없습니다.'); return; }
+  rem.forEach(st => {
+    const tot = c.teams.map(t => {
+      const m = c.students.filter(s => s.teamId === t.id);
+      return { id: t.id, n: m.length, sum: m.reduce((a, x) => a + totalScore(x), 0) };
+    }).sort((a, b) => a.n - b.n || a.sum - b.sum);
+    st.teamId = tot[0].id;
+    c.pickHistory.push({ studentId: st.id, teamId: tot[0].id });
+  });
+  saveState(); renderAll(); toast('남은 인원을 인원수·능력치 균형에 맞춰 배정했습니다.');
+}
+
+async function resetDraftOnly() {
+  if (!await askConfirm('모든 팀·팀장 배정을 초기화할까요? (경기 기록은 유지됩니다)')) return;
+  const c = cls();
+  c.students.forEach(s => { s.teamId = null; s.isCaptain = false; });
+  c.pickHistory = [];
+  saveState(); renderAll();
+}
+
+function selectManualTeam(teamId) {
+  const c = cls();
+  if (c.draftOrderMode !== 'manual') return;
+  c.manualTargetTeamId = teamId;
+  saveState(); renderAll();
+}
+
+function toggleBlind() { appState.blindMode = !appState.blindMode; saveState(); renderAll(); }
+function toggleRawRecord() { appState.showRawRecord = !appState.showRawRecord; saveState(); renderAll(); }
+function shuffleAnonCodes() {
+  const c = cls();
+  const codes = shuffleArr(Array.from({ length: c.students.length }, (_, i) => i + 1));
+  c.students.forEach((s, i) => s.anonCode = codes[i]);
+  saveState(); renderAll(); toast('익명 코드를 다시 섞었습니다.');
+}
+
+/* =========================================================
+ * 6. 비선수 역할
+ * ========================================================= */
+function renderRoles() {
+  const c = cls();
+  document.getElementById('roleFilter').value = ui.roleFilter;
+  if (!c.roles.length) { document.getElementById('roleBoard').innerHTML = '<div class="empty">비선수 역할이 없습니다. [⚙ 역할 편집]에서 추가하세요.</div>'; }
+  else document.getElementById('roleBoard').innerHTML = c.roles.map(r => {
+    const list = c.students.filter(s => s.nonPlayerRole === r.id);
+    const isCheer = r.quota === null;
+    const q = r.quota;
+    return `
+      <div class="role-card">
+        <div class="row between" style="margin-bottom:4px;">
+          <b style="color:var(--primary)">${esc(r.name)}</b>
+          ${isCheer ? `<span class="small muted">${list.length}명 · 인원 제한 없음</span>` : `
+            <span class="row small" style="gap:4px;">
+              <span class="${list.length >= q ? 'bold' : 'muted'}">${list.length} / ${q}명</span>
+              <button class="outline sm" onclick="changeQuota('${r.id}', -1)">−</button>
+              <button class="outline sm" onclick="changeQuota('${r.id}', 1)">+</button>
+            </span>`}
+        </div>
+        <div class="small muted" style="margin-bottom:8px;">${esc(r.desc || '')}</div>
+        ${list.length ? list.map(s => `
+          <div class="member">
+            <span>${realName(s)} <span class="rec">${totalScore(s)}점</span></span>
+            <span class="row" style="gap:4px;">
+              ${isCheer ? `<select onchange="setCheerTeam('${s.id}', this.value)" style="font-size:.75rem;">
+                  <option value="">${r.id === 'cheer' ? '전체 응원' : '팀 지정 안 함'}</option>
+                  ${c.teams.map(t => `<option value="${t.id}" ${s.cheerTeamId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+                </select>` : ''}
+              <button class="link" onclick="assignRole('${s.id}', null)">✕</button>
+            </span>
+          </div>`).join('') : '<div class="empty">배정된 학생 없음</div>'}
+      </div>`;
+  }).join('');
+
+  let cand = c.students.slice().sort((a, b) => a.num - b.num);
+  if (ui.roleFilter === 'unassigned') cand = cand.filter(s => !s.teamId && !s.nonPlayerRole);
+  const wrap = document.getElementById('roleCandidates');
+  if (!cand.length) { wrap.innerHTML = '<div class="empty">표시할 학생이 없습니다.</div>'; return; }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr><th>번호</th><th>이름</th><th>종합</th><th>현재 상태</th><th>역할 지정</th></tr></thead>
+      <tbody>${cand.map(s => {
+        const team = c.teams.find(t => t.id === s.teamId);
+        return `<tr>
+          <td>${s.num}</td><td>${esc(s.name)}</td><td>${totalScore(s)}</td>
+          <td class="small">${s.nonPlayerRole ? roleName(s.nonPlayerRole) : team ? esc(team.name) + (s.isCaptain ? ' 팀장' : '') : '<span class="muted">미배정</span>'}</td>
+          <td><div class="row" style="justify-content:center; gap:4px;">
+            ${c.roles.map(r => `<button class="${s.nonPlayerRole === r.id ? '' : 'outline'} sm" onclick="assignRole('${s.id}', '${r.id}')">${esc(r.name)}</button>`).join('')}
+          </div></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+function changeQuota(roleId, d) {
+  const r = roleOf(roleId);
+  if (!r || r.quota === null) return;
+  r.quota = Math.max(0, r.quota + d);
+  saveState(); renderAll();
+}
+function assignRole(id, roleId) {
+  const c = cls();
+  const st = c.students.find(s => s.id === id);
+  if (!st) return;
+  st.nonPlayerRole = roleId || null;
+  if (roleId) { st.teamId = null; st.isCaptain = false; c.pickHistory = c.pickHistory.filter(h => h.studentId !== id); }
+  else st.cheerTeamId = null;
+  saveState(); renderAll();
+}
+function setCheerTeam(id, teamId) {
+  const st = cls().students.find(s => s.id === id);
+  if (st) { st.cheerTeamId = teamId || null; saveState(); }
+}
+function sendRemainingToRoles(random) {
+  const c = cls();
+  let rem = c.students.filter(s => !s.teamId && !s.nonPlayerRole);
+  if (!rem.length) { toast('미선발 학생이 없습니다.', true); return; }
+  if (random) shuffleArr(rem); else rem.sort((a, b) => a.num - b.num);
+  // 정원 있는 역할을 목록 순서대로 채우고, 남은 인원은 '제한 없음' 역할(첫 번째)로
+  const need = r => Math.max(0, r.quota - c.students.filter(s => s.nonPlayerRole === r.id).length);
+  const limited = c.roles.filter(r => r.quota !== null);
+  const rest = c.roles.find(r => r.quota === null);
+  let done = 0;
+  rem.forEach(st => {
+    const r = limited.find(x => need(x) > 0) || rest;
+    if (r) { st.nonPlayerRole = r.id; done++; }
+  });
+  saveState(); renderAll();
+  if (done < rem.length) toast(`${done}명 배정 · ${rem.length - done}명은 정원이 차서 미배정으로 남았습니다. (제한 없음 역할을 추가하면 자동 배정됩니다)`, true);
+  else toast(`미선발 ${rem.length}명을 비선수 역할에 배정했습니다.`);
+}
+async function clearAllRoles() {
+  if (!await askConfirm('모든 비선수 역할을 해제할까요?')) return;
+  cls().students.forEach(s => { s.nonPlayerRole = null; s.cheerTeamId = null; });
+  saveState(); renderAll();
+}
+
+/* ---------- 비선수 역할 편집 ---------- */
+function roleEditRow(r) {
+  const unl = r.quota === null;
+  return `<tr data-id="${esc(r.id)}">
+    <td><div class="ord">
+      <button type="button" class="outline sm" onclick="moveRoleRow(this,-1)" title="위로">▲</button>
+      <button type="button" class="outline sm" onclick="moveRoleRow(this,1)" title="아래로">▼</button>
+    </div></td>
+    <td><input type="text" class="re-name" value="${esc(r.name)}" placeholder="역할 이름"></td>
+    <td style="white-space:nowrap;">
+      <input type="number" class="num re-quota" min="0" value="${unl ? '' : r.quota}" ${unl ? 'disabled' : ''}> 명<br>
+      <label class="small"><input type="checkbox" class="re-unl" ${unl ? 'checked' : ''} onchange="const q=this.closest('tr').querySelector('.re-quota'); q.disabled=this.checked; if(!this.checked && !q.value) q.value=1;"> 제한 없음</label>
+    </td>
+    <td><input type="text" class="re-desc" value="${esc(r.desc || '')}" placeholder="역할 설명"></td>
+    <td><textarea class="re-comment" placeholder="생기부 참고 문구 (CSV 내보내기에 사용)">${esc(r.comment || '')}</textarea></td>
+    <td><button type="button" class="link" style="color:var(--danger)" onclick="this.closest('tr').remove()">삭제</button></td>
+  </tr>`;
+}
+function openRoleEditor() {
+  const c = cls();
+  openModal(`
+    <div class="modal-head"><h3>비선수 역할 편집 · ${esc(c.name)}</h3><button class="outline sm" onclick="closeModal()">닫기</button></div>
+    <p class="small muted" style="margin-bottom:10px;">
+      [미선발 → 배정]은 정원 있는 역할을 <b>위에서부터 순서대로</b> 채우고, 남은 인원은 <b>'제한 없음' 역할 중 첫 번째</b>로 보냅니다.<br>
+      '제한 없음' 역할은 학생별로 응원할 팀을 지정할 수 있습니다. 삭제한 역할을 맡았던 학생은 미배정으로 돌아갑니다.
+    </p>
+    <div class="table-wrap">
+      <table class="role-edit">
+        <thead><tr><th>순서</th><th style="width:16%">역할 이름</th><th>정원</th><th style="width:24%">설명</th><th>생기부 참고 문구</th><th></th></tr></thead>
+        <tbody id="roleEditBody">${c.roles.map(roleEditRow).join('')}</tbody>
+      </table>
+    </div>
+    <div class="row between" style="margin-top:10px;">
+      <button type="button" class="accent sm" onclick="addRoleRow()">+ 역할 추가</button>
+      <button type="button" class="outline sm" onclick="resetRoleRows()">기본 역할로 되돌리기</button>
+    </div>
+    <label class="small" style="display:block; margin-top:12px;"><input type="checkbox" id="roleApplyAll"> 다른 학급(${appState.classes.length - 1}개)에도 같은 역할 목록 적용</label>
+    <div class="modal-foot">
+      <button class="outline" onclick="closeModal()">취소</button>
+      <button class="accent" onclick="saveRoleEditor()">저장</button>
+    </div>`, true);
+}
+function addRoleRow() {
+  const body = document.getElementById('roleEditBody');
+  body.insertAdjacentHTML('beforeend', roleEditRow({ id: 'role_' + Date.now().toString(36), name: '', quota: 1, desc: '', comment: '' }));
+  body.lastElementChild.querySelector('.re-name').focus();
+}
+function moveRoleRow(btn, d) {
+  const tr = btn.closest('tr');
+  const sib = d < 0 ? tr.previousElementSibling : tr.nextElementSibling;
+  if (sib) d < 0 ? sib.before(tr) : sib.after(tr);
+}
+async function resetRoleRows() {
+  if (!await askConfirm('편집 중인 내용을 기본 역할(심판·점수 집계·환경 도우미·응원단)로 바꿀까요?')) return;
+  document.getElementById('roleEditBody').innerHTML = defaultRoles().map(roleEditRow).join('');
+}
+function applyRolesToClass(c, roles) {
+  const ids = new Set(roles.map(r => r.id));
+  let cleared = 0;
+  c.students.forEach(s => { if (s.nonPlayerRole && !ids.has(s.nonPlayerRole)) { s.nonPlayerRole = null; s.cheerTeamId = null; cleared++; } });
+  c.roles = cloneRoles(roles);
+  return cleared;
+}
+async function saveRoleEditor() {
+  const rows = [...document.querySelectorAll('#roleEditBody tr')];
+  const roles = [];
+  for (const tr of rows) {
+    const name = tr.querySelector('.re-name').value.trim();
+    if (!name) { toast('역할 이름이 비어 있는 줄이 있습니다.', true); tr.querySelector('.re-name').focus(); return; }
+    const unl = tr.querySelector('.re-unl').checked;
+    roles.push({
+      id: tr.dataset.id, name,
+      quota: unl ? null : Math.max(0, Math.floor(Number(tr.querySelector('.re-quota').value) || 0)),
+      desc: tr.querySelector('.re-desc').value.trim(),
+      comment: tr.querySelector('.re-comment').value.trim()
+    });
+  }
+  const all = document.getElementById('roleApplyAll').checked;
+  const targets = all ? appState.classes : [cls()];
+  const ids = new Set(roles.map(r => r.id));
+  const affected = targets.reduce((n, c) => n + c.students.filter(s => s.nonPlayerRole && !ids.has(s.nonPlayerRole)).length, 0);
+  if (affected && !await askConfirm(`삭제한 역할을 맡은 학생 ${affected}명이 미배정으로 돌아갑니다. 저장할까요?`)) return;
+  targets.forEach(c => applyRolesToClass(c, roles));
+  saveState(); closeModal(); renderAll();
+  toast(all ? `모든 학급(${targets.length}개)에 역할 ${roles.length}개를 적용했습니다.` : `역할 ${roles.length}개를 저장했습니다.`);
+}
+
+/* =========================================================
+ * 6-1. 선발 선수 능력치
+ * ========================================================= */
+const FACTORS = [
+  { k: 'cardio', n: '심폐지구력', sh: '심폐', rec: 'cardioRec', u: '회' },
+  { k: 'power', n: '순발력', sh: '순발력', rec: 'powerRec', u: 'cm' },
+  { k: 'strength', n: '근력·근지구력', sh: '근력', rec: 'strengthRec', u: 'kg' },
+  { k: 'flex', n: '유연성', sh: '유연성', rec: 'flexRec', u: 'cm' },
+  { k: 'bmi', n: '비만(BMI)', sh: 'BMI', rec: 'bmiVal', u: '' }
+];
+const fmt1 = v => (Math.round(v * 10) / 10).toFixed(1);
+const avgOf = (arr, f) => arr.length ? arr.reduce((a, s) => a + (Number(f(s)) || 0), 0) / arr.length : 0;
+
+function teamStatsOf(c) {
+  return c.teams.map(t => {
+    const m = c.students.filter(s => s.teamId === t.id);
+    const f = {};
+    FACTORS.forEach(x => f[x.k] = avgOf(m, s => s[x.k]));
+    const ranked = FACTORS.slice().sort((a, b) => f[b.k] - f[a.k]);
+    return { t, m, n: m.length, f, avgTotal: avgOf(m, totalScore), sumTotal: m.reduce((a, s) => a + totalScore(s), 0),
+             avgRaw: avgOf(m, papsRaw), best: ranked[0], worst: ranked[ranked.length - 1] };
+  });
+}
+
+function radarSVG(stats) {
+  const S = 300, cx = 150, cy = 150, R = 105, N = FACTORS.length;
+  const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / N; return [cx + Math.cos(a) * R * v, cy + Math.sin(a) * R * v]; };
+  let g = '';
+  [0.25, 0.5, 0.75, 1].forEach(l => {
+    g += `<polygon points="${FACTORS.map((_, i) => pt(i, l).join(',')).join(' ')}" fill="none" stroke="#e2e8f0"/>`;
+  });
+  FACTORS.forEach((x, i) => {
+    const [ex, ey] = pt(i, 1), [lx, ly] = pt(i, 1.2);
+    g += `<line x1="${cx}" y1="${cy}" x2="${ex}" y2="${ey}" stroke="#e2e8f0"/>`;
+    g += `<text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="11.5" fill="#475569">${x.sh}</text>`;
+  });
+  g += `<text x="${cx + 3}" y="${cy - R + 12}" font-size="9" fill="#94a3b8">20</text><text x="${cx + 3}" y="${cy - R / 2 + 10}" font-size="9" fill="#94a3b8">10</text>`;
+  stats.filter(s => s.n).forEach(s => {
+    const col = teamColor(s.t);
+    const pts = FACTORS.map((x, i) => pt(i, Math.min(1, s.f[x.k] / 20)).join(',')).join(' ');
+    g += `<polygon points="${pts}" fill="${col}" fill-opacity=".10" stroke="${col}" stroke-width="2"><title>${esc(s.t.name)}</title></polygon>`;
+    FACTORS.forEach((x, i) => { const [px, py] = pt(i, Math.min(1, s.f[x.k] / 20)); g += `<circle cx="${px}" cy="${py}" r="3" fill="${col}"><title>${esc(s.t.name)} ${x.n} ${fmt1(s.f[x.k])}</title></circle>`; });
+  });
+  return `<svg viewBox="0 0 ${S} ${S}" width="100%" style="max-width:320px; display:block; margin:0 auto;">${g}</svg>
+    <div class="radar-legend">${stats.filter(s => s.n).map(s => `<span style="--c:${teamColor(s.t)}"><span class="dot"></span>${esc(s.t.name)}</span>`).join('')}</div>
+    <div class="small muted" style="text-align:center; margin-top:4px;">팀 평균 PAPS 요인 점수 (각 20점 만점)</div>`;
+}
+
+function factorCell(s, x, col) {
+  const v = Number(s[x.k] || 0);
+  const rec = appState.showRawRecord && s[x.rec] !== '' && s[x.rec] != null ? `<div class="rec">${esc(s[x.rec])}${x.u}</div>` : '';
+  return `<td class="fcell" style="--c:${col}">${v}${rec}<div class="fbar"><i style="width:${Math.min(100, v / 20 * 100)}%"></i></div></td>`;
+}
+
+function renderStats() {
+  const c = cls();
+  const players = c.students.filter(s => s.teamId);
+  const stats = teamStatsOf(c);
+  const totals = playerTotals(c);
+  document.getElementById('statsBasis').textContent = `· 종합 = 가중치(${presetName(c)}) 적용 PAPS + 실기보정`;
+  document.getElementById('statsCount').textContent = `${players.length}명 (팀장 ${players.filter(s => s.isCaptain).length}명 포함)`;
+  document.getElementById('statsSort').value = ui.statsSort;
+  document.getElementById('statsModeSeg').innerHTML = [['team', '팀별 보기'], ['rank', '전체 순위']]
+    .map(([v, n]) => `<button class="${ui.statsMode === v ? 'on' : ''}" onclick="ui.statsMode='${v}'; renderStats()">${n}</button>`).join('');
+
+  if (!players.length) {
+    document.getElementById('statsTop').innerHTML = '<div class="empty">아직 선발된 선수가 없습니다. [1. 팀 드래프트]에서 팀을 구성하면 여기에 능력치가 표시됩니다.</div>';
+    document.getElementById('statsPlayers').innerHTML = '';
+    return;
+  }
+
+  // 팀 요약표: 열마다 최고값 강조
+  const act = stats.filter(s => s.n);
+  const maxOf = f => Math.max(...act.map(f));
+  const bestCls = (s, f) => act.length > 1 && s.n && Math.abs(f(s) - maxOf(f)) < 1e-9 ? 'best' : '';
+  const all = { n: players.length, f: Object.fromEntries(FACTORS.map(x => [x.k, avgOf(players, s => s[x.k])])), avgTotal: avgOf(players, totalScore), avgRaw: avgOf(players, papsRaw) };
+  const diff = act.length > 1 ? maxOf(s => s.avgTotal) - Math.min(...act.map(s => s.avgTotal)) : 0;
+  document.getElementById('statsTop').innerHTML = `
+    <div class="stat-top">
+      <div>${radarSVG(stats)}</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>팀</th><th>인원</th><th>평균 종합</th><th>종합 합계</th>${FACTORS.map(x => `<th>${x.sh}</th>`).join('')}<th>PAPS 평균</th><th class="left">강점 / 보완</th></tr></thead>
+          <tbody>${stats.map(s => `<tr class="${s.n ? '' : 'dim'}">
+            <td class="left" style="--c:${teamColor(s.t)}"><span class="dot"></span><b>${esc(s.t.name)}</b></td>
+            <td>${s.n}</td>
+            <td class="${bestCls(s, x => x.avgTotal)}">${s.n ? fmt1(s.avgTotal) : '-'}</td>
+            <td class="${bestCls(s, x => x.sumTotal)}">${s.n ? fmt1(s.sumTotal) : '-'}</td>
+            ${FACTORS.map(x => `<td class="${bestCls(s, y => y.f[x.k])}">${s.n ? fmt1(s.f[x.k]) : '-'}</td>`).join('')}
+            <td>${s.n ? `${fmt1(s.avgRaw)} ${gradeBadge(gradeOf(s.avgRaw))}` : '-'}</td>
+            <td class="left small">${s.n ? `▲ ${s.best.sh} · ▽ ${s.worst.sh}` : ''}</td>
+          </tr>`).join('')}</tbody>
+          <tfoot><tr>
+            <td class="left">선수 전체</td><td>${all.n}</td><td>${fmt1(all.avgTotal)}</td><td>-</td>
+            ${FACTORS.map(x => `<td>${fmt1(all.f[x.k])}</td>`).join('')}
+            <td>${fmt1(all.avgRaw)} ${gradeBadge(gradeOf(all.avgRaw))}</td><td></td>
+          </tr></tfoot>
+        </table>
+        <p class="small muted" style="margin-top:8px;">초록 칸 = 해당 항목 최고 팀 · 요인 점수는 20점 만점 평균 · PAPS 평균은 원점수(100점) 기준 등급
+          ${act.length > 1 ? ` · 팀 평균 종합 최대 편차 <b>${fmt1(diff)}점</b> (${diff <= 4.5 ? '균형' : diff <= 9 ? '양호' : '편차 주의'})` : ''}</p>
+      </div>
+    </div>`;
+
+  // 선수 상세
+  const fs = statFields(c);
+  const lp = s => totals[s.id]?.pts || 0;
+  const sorters = {
+    total: (a, b) => totalScore(b) - totalScore(a), num: (a, b) => a.num - b.num,
+    league: (a, b) => lp(b) - lp(a) || totalScore(b) - totalScore(a)
+  };
+  FACTORS.forEach(x => sorters[x.k] = (a, b) => (Number(b[x.k]) || 0) - (Number(a[x.k]) || 0) || totalScore(b) - totalScore(a));
+  const sortFn = sorters[ui.statsSort] || sorters.total;
+  const head = withTeam => `<thead><tr>${withTeam ? '<th>순위</th><th>팀</th>' : '<th></th>'}<th class="left">선수</th>
+    ${FACTORS.map(x => `<th>${x.sh}</th>`).join('')}<th>보정</th><th>종합</th><th>PAPS</th>
+    <th>출전</th>${fs.map(f => `<th>${esc(f.name)}</th>`).join('')}<th>MVP</th></tr></thead>`;
+  const row = (s, i, withTeam) => {
+    const t = c.teams.find(x => x.id === s.teamId), col = t ? teamColor(t) : '#94a3b8';
+    const p = totals[s.id] || { games: 0, v: {}, mvp: 0 };
+    return `<tr>
+      ${withTeam ? `<td>${i + 1}</td><td style="--c:${col}" class="left"><span class="dot"></span>${esc(t?.name || '')}</td>` : `<td>${s.isCaptain ? '👑' : ''}</td>`}
+      <td class="left"><b>${dispName(s)}</b>${withTeam && s.isCaptain ? ' 👑' : ''}</td>
+      ${FACTORS.map(x => factorCell(s, x, col)).join('')}
+      <td>${Number(s.bonus || 0) ? (s.bonus > 0 ? '+' : '') + s.bonus : '-'}</td>
+      <td><b>${totalScore(s)}</b></td>
+      <td>${gradeBadge(gradeOf(papsRaw(s)))}</td>
+      <td>${p.games}</td>${fs.map(f => { const n = p.v[f.id] || 0; return `<td>${f.score && n ? '<b>' + n + '</b>' : n}</td>`; }).join('')}<td>${p.mvp ? `<span class="badge-mvp">${p.mvp}</span>` : '-'}</td>
+    </tr>`;
+  };
+  const wrap = document.getElementById('statsPlayers');
+  if (ui.statsMode === 'rank') {
+    wrap.innerHTML = `<div class="table-wrap"><table>${head(true)}<tbody>${players.slice().sort(sortFn).map((s, i) => row(s, i, true)).join('')}</tbody></table></div>`;
+  } else {
+    wrap.innerHTML = stats.filter(s => s.n).map(s => {
+      const col = teamColor(s.t);
+      const lg = { v: Object.fromEntries(fs.map(f => [f.id, 0])), mvp: 0 };
+      s.m.forEach(x => { const p = totals[x.id]; if (p) { fs.forEach(f => lg.v[f.id] += p.v[f.id] || 0); lg.mvp += p.mvp; } });
+      return `<div class="team-stat" style="--c:${col}">
+        <h4>${esc(s.t.name)} <span class="small muted">${s.n}명 · 평균 종합 ${fmt1(s.avgTotal)} · 강점 ${s.best.n} · 보완 ${s.worst.n}</span></h4>
+        <div class="table-wrap"><table>${head(false)}
+          <tbody>${s.m.slice().sort((a, b) => (b.isCaptain - a.isCaptain) || sortFn(a, b)).map((x, i) => row(x, i, false)).join('')}</tbody>
+          <tfoot><tr><td></td><td class="left">팀 평균 / 합계</td>${FACTORS.map(x => `<td>${fmt1(s.f[x.k])}</td>`).join('')}
+            <td></td><td>${fmt1(s.avgTotal)}</td><td>${gradeBadge(gradeOf(s.avgRaw))}</td><td></td>${fs.map(f => `<td>${lg.v[f.id]}</td>`).join('')}<td>${lg.mvp || '-'}</td></tr></tfoot>
+        </table></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function exportStats() {
+  const c = cls();
+  const players = c.students.filter(s => s.teamId);
+  if (!players.length) { toast('선발된 선수가 없습니다.', true); return; }
+  const totals = playerTotals(c);
+  const order = new Map(c.teams.map((t, i) => [t.id, i]));
+  const rows = players.slice().sort((a, b) => order.get(a.teamId) - order.get(b.teamId) || (b.isCaptain - a.isCaptain) || totalScore(b) - totalScore(a)).map(s => {
+    const p = totals[s.id] || { games: 0, v: {}, mvp: 0 };
+    const r = { '팀': c.teams.find(t => t.id === s.teamId)?.name || '', '직책': s.isCaptain ? '팀장' : '선수', '번호': s.num, '성명': s.name, '익명코드': codeOf(s) };
+    FACTORS.forEach(x => r[x.n] = Number(s[x.k] || 0));
+    Object.assign(r, { '실기보정': s.bonus || 0, '종합(가중치)': totalScore(s), 'PAPS원점수': papsRaw(s), 'PAPS등급': gradeOf(papsRaw(s)) + '등급',
+      '출전': p.games });
+    statFields(c).forEach(f => r[f.name] = p.v[f.id] || 0);
+    r['MVP'] = p.mvp;
+    return r;
+  });
+  const sum = teamStatsOf(c).filter(s => s.n).map(s => {
+    const r = { '팀': s.t.name, '인원': s.n, '평균 종합': +fmt1(s.avgTotal), '종합 합계': +fmt1(s.sumTotal) };
+    FACTORS.forEach(x => r[x.n + ' 평균'] = +fmt1(s.f[x.k]));
+    r['PAPS 평균'] = +fmt1(s.avgRaw); r['강점'] = s.best.n; r['보완'] = s.worst.n;
+    return r;
+  });
+  const fname = `${safeFile(c.name)}_선발선수능력치_${today()}`;
+  if (typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sum), '팀별 요약');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '선수별 능력치');
+    download(fname + '.xlsx', new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]));
+  } else {
+    const keys = Object.keys(rows[0]);
+    download(fname + '.csv', '﻿' + keys.join(',') + '\n' + rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+  }
+}
+
+/* =========================================================
+ * 7. 명단·PAPS 관리
+ * ========================================================= */
+function renderRoster() {
+  document.getElementById('rosterSearch').value = ui.rosterQuery;
+  renderRosterBody();
+}
+function renderRosterBody() {
+  const c = cls();
+  document.getElementById('rosterTitle').textContent = `${c.name} 명단 (${c.students.length}명)`;
+  const q = ui.rosterQuery.trim().toLowerCase();
+  const list = c.students.filter(s => !q || String(s.name).toLowerCase().includes(q) || String(s.num).includes(q)).sort((a, b) => a.num - b.num);
+  const body = document.getElementById('rosterBody');
+  if (!list.length) { body.innerHTML = '<tr><td colspan="14" class="empty">등록된 학생이 없습니다.</td></tr>'; return; }
+  const scoreIn = (s, f, recVal, unit) => `<input class="num" type="number" min="0" max="20" value="${s[f]}" onchange="updateField('${s.id}','${f}',this.value)">${recVal !== '' && recVal !== undefined ? `<div class="rec">${recVal}${unit}</div>` : ''}`;
+  body.innerHTML = list.map(s => {
+    const cur = s.nonPlayerRole ? 'role:' + s.nonPlayerRole : s.teamId ? 'team:' + s.teamId : '';
+    return `<tr>
+      <td><input class="num" type="number" value="${s.num}" onchange="updateField('${s.id}','num',this.value)"></td>
+      <td><input class="name" type="text" value="${esc(s.name)}" onchange="updateField('${s.id}','name',this.value)"></td>
+      <td class="muted">${codeOf(s)}</td>
+      <td>${s.isCaptain ? `<select onchange="assignCaptain('${s.id}', this.value)" style="font-size:.78rem;">
+            ${c.teams.map(t => `<option value="${t.id}" ${s.teamId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+          </select> <button class="link" onclick="assignCaptain('${s.id}')">해제</button>`
+        : `<button class="outline sm" onclick="assignCaptain('${s.id}')">지정</button>`}</td>
+      <td>${scoreIn(s, 'cardio', s.cardioRec, '회')}</td>
+      <td>${scoreIn(s, 'flex', s.flexRec, 'cm')}</td>
+      <td>${scoreIn(s, 'strength', s.strengthRec, 'kg')}</td>
+      <td>${scoreIn(s, 'power', s.powerRec, 'cm')}</td>
+      <td>${scoreIn(s, 'bmi', s.bmiVal, '')}</td>
+      <td><input class="num" type="number" min="-30" max="50" value="${s.bonus || 0}" onchange="updateField('${s.id}','bonus',this.value)"></td>
+      <td><b>${totalScore(s)}</b></td>
+      <td>${gradeBadge(gradeOf(papsRaw(s)))}</td>
+      <td><select onchange="setRosterStatus('${s.id}', this.value)" style="font-size:.8rem;">
+        <option value="">미배정</option>
+        <optgroup label="팀">${c.teams.map(t => `<option value="team:${t.id}" ${cur === 'team:' + t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>
+        <optgroup label="비선수">${c.roles.map(r => `<option value="role:${r.id}" ${cur === 'role:' + r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</optgroup>
+      </select></td>
+      <td><button class="link" onclick="deleteStudent('${s.id}')" title="삭제">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+function updateField(id, f, v) {
+  const st = cls().students.find(s => s.id === id);
+  if (!st) return;
+  if (['cardio', 'flex', 'strength', 'power', 'bmi'].includes(f)) st[f] = Math.max(0, Math.min(20, Number(v) || 0));
+  else if (f === 'bonus' || f === 'num') st[f] = Number(v) || 0;
+  else if (String(v).trim()) st[f] = String(v).trim();
+  saveState(); renderRosterBody();
+}
+function setRosterStatus(id, v) {
+  const c = cls();
+  const st = c.students.find(s => s.id === id);
+  if (!st) return;
+  if (!v) { st.teamId = null; st.isCaptain = false; st.nonPlayerRole = null; }
+  else if (v.startsWith('team:')) {
+    const tid = v.slice(5);
+    if (st.isCaptain && st.teamId !== tid) st.isCaptain = false;
+    st.teamId = tid; st.nonPlayerRole = null;
+  } else { st.nonPlayerRole = v.slice(5); st.teamId = null; st.isCaptain = false; }
+  saveState(); renderAll();
+}
+async function deleteStudent(id) {
+  const c = cls();
+  const st = c.students.find(s => s.id === id);
+  if (!st || !await askConfirm(`${st.name} 학생을 명단에서 삭제할까요?`)) return;
+  c.students = c.students.filter(s => s.id !== id);
+  c.pickHistory = c.pickHistory.filter(h => h.studentId !== id);
+  saveState(); renderAll();
+}
+async function clearAllStudents() {
+  const c = cls();
+  if (!await askConfirm(`[${c.name}] 명단과 경기 기록을 모두 비울까요?`)) return;
+  c.students = []; c.pickHistory = []; c.matches = {};
+  saveState(); renderAll();
+}
+function openAddStudentModal() {
+  const c = cls();
+  const f = (id, label, val) => `<div><label>${label}<input id="${id}" type="number" value="${val}"></label></div>`;
+  openModal(`
+    <div class="modal-head"><h3>학생 개별 추가</h3><button class="outline sm" onclick="closeModal()">닫기</button></div>
+    <div class="form-grid">
+      ${f('aNum', '번호', c.students.length + 1)}
+      <div><label>성명<input id="aName" type="text" placeholder="홍길동"></label></div>
+      ${f('aCardio', '심폐지구력 (0~20)', 14)}${f('aFlex', '유연성 (0~20)', 14)}
+      ${f('aStr', '근력·근지구력 (0~20)', 14)}${f('aPow', '순발력 (0~20)', 14)}
+      ${f('aBmi', 'BMI 점수 (0~20)', 16)}${f('aBonus', '교사 실기보정', 0)}
+    </div>
+    <div class="modal-foot"><button class="outline" onclick="closeModal()">취소</button><button class="accent" onclick="confirmAddStudent()">추가</button></div>`);
+}
+function confirmAddStudent() {
+  const c = cls();
+  const g = id => Number(document.getElementById(id).value) || 0;
+  const cl = v => Math.max(0, Math.min(20, v));
+  const name = document.getElementById('aName').value.trim() || `학생${c.students.length + 1}`;
+  const maxCode = c.students.reduce((m, s) => Math.max(m, s.anonCode || 0), 0);
+  c.students.push({
+    id: 'stu_' + Date.now(), num: g('aNum') || c.students.length + 1, name, anonCode: maxCode + 1,
+    cardio: cl(g('aCardio')), cardioRec: '', flex: cl(g('aFlex')), flexRec: '',
+    strength: cl(g('aStr')), strengthRec: '', power: cl(g('aPow')), powerRec: '',
+    bmi: cl(g('aBmi')), bmiVal: '', bmiStatus: '', bonus: g('aBonus'),
+    isCaptain: false, teamId: null, nonPlayerRole: null, cheerTeamId: null
+  });
+  closeModal(); saveState(); renderAll(); toast(`${name} 학생을 추가했습니다.`);
+}
+function downloadSampleTemplate() {
+  const header = ['번호', '성명', '심폐지구력', '유연성', '근력·근지구력', '순발력', 'BMI점수', '실기보정', '팀장'];
+  const rows = [[1, '학생1', 15, 16, 14, 15, 18, 0, 'O'], [2, '학생2', 12, 14, 12, 13, 16, 0, '']];
+  const csv = '﻿' + [header, ...rows].map(r => r.join(',')).join('\n');
+  download('PAPS_명단양식_샘플.csv', csv, 'text/csv;charset=utf-8');
+}
+
+/* =========================================================
+ * 8. 팀 설정 & 밸런스
+ * ========================================================= */
+function renderTeams() {
+  const c = cls();
+  const pid = presetIdOf(c.weights);
+  document.getElementById('weightNow').textContent = '현재: ' + presetName(c);
+  document.getElementById('presetBtns').innerHTML = Object.entries(WEIGHT_PRESETS).map(([id, p]) =>
+    `<button class="${pid === id ? '' : 'outline'} sm" onclick="applyPreset('${id}')" title="${p.why}">${p.name}</button>`).join('') +
+    (pid === 'custom' ? '<span class="small muted">사용자 지정 중</span>' : `<span class="small muted">${WEIGHT_PRESETS[pid].why}</span>`);
+  const sumW = WEIGHT_KEYS.reduce((a, [k]) => a + (Number(c.weights[k]) || 0), 0) || 1;
+  document.getElementById('weightTable').innerHTML = `
+    <table>
+      <thead><tr>${WEIGHT_KEYS.map(([, n]) => `<th>${n}</th>`).join('')}</tr></thead>
+      <tbody>
+        <tr>${WEIGHT_KEYS.map(([k]) => `<td><input class="num" type="number" min="0" max="5" step="0.5" value="${c.weights[k]}" onchange="setWeight('${k}', this.value)"> 배</td>`).join('')}</tr>
+        <tr>${WEIGHT_KEYS.map(([k]) => `<td class="small muted">반영 비율 ${Math.round((Number(c.weights[k]) || 0) / sumW * 100)}%</td>`).join('')}</tr>
+      </tbody>
+    </table>`;
+
+  document.getElementById('modeBtns').innerHTML = `
+    <button class="${c.draftOrderMode === 'snake' ? '' : 'outline'} sm" onclick="setDraftMode('snake')">스네이크 (권장)</button>
+    <button class="${c.draftOrderMode === 'manual' ? '' : 'outline'} sm" onclick="setDraftMode('manual')">수동 지명</button>`;
+  document.getElementById('teamConfigList').innerHTML = c.teams.map((t, i) => `
+    <div class="row" style="margin-bottom:8px; --c:${teamColor(t)}">
+      <span class="dot"></span>
+      <input type="text" value="${esc(t.name)}" onchange="renameTeam('${t.id}', this.value)" style="flex:1;">
+      <span class="small muted">${c.students.filter(s => s.teamId === t.id).length}명</span>
+      ${c.teams.length > 2 ? `<button class="link" onclick="removeTeam('${t.id}')">삭제</button>` : ''}
+    </div>`).join('');
+
+  const stats = c.teams.map(t => {
+    const m = c.students.filter(s => s.teamId === t.id);
+    const avg = f => m.length ? m.reduce((a, s) => a + f(s), 0) / m.length : 0;
+    return { t, n: m.length, total: avg(totalScore), cardio: avg(s => s.cardio), power: avg(s => s.power), strength: avg(s => s.strength), flex: avg(s => s.flex) };
+  });
+  const act = stats.filter(s => s.n).map(s => s.total);
+  const v = document.getElementById('balanceVerdict');
+  if (act.length >= 2) {
+    const diff = Math.max(...act) - Math.min(...act);
+    v.innerHTML = `<span class="grade ${diff <= 4.5 ? 'g1' : diff <= 9 ? 'g3' : 'g4'}">${diff <= 4.5 ? '균형' : diff <= 9 ? '양호' : '편차 주의'} · 최대 편차 ${diff.toFixed(1)}점</span>`;
+  } else v.innerHTML = '<span class="muted">팀 배정 후 계산</span>';
+  const maxTotal = Math.max(...stats.map(s => s.total), 0);
+  document.getElementById('balanceTable').innerHTML = `
+    <table>
+      <thead><tr><th>팀</th><th>인원</th><th>평균 종합</th><th>심폐</th><th>순발력</th><th>근력</th><th>유연성</th></tr></thead>
+      <tbody>${stats.map(s => `<tr>
+        <td class="left" style="--c:${teamColor(s.t)}"><span class="dot"></span>${esc(s.t.name)}</td>
+        <td>${s.n}</td>
+        <td><b ${s.n && s.total === maxTotal ? 'style="color:var(--danger)"' : ''}>${s.total.toFixed(1)}</b></td>
+        <td>${s.cardio.toFixed(1)}</td><td>${s.power.toFixed(1)}</td><td>${s.strength.toFixed(1)}</td><td>${s.flex.toFixed(1)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+function applyPreset(id) {
+  cls().weights = { ...WEIGHT_PRESETS[id].w };
+  saveState(); renderAll(); toast(`능력치 기준: ${WEIGHT_PRESETS[id].name}`);
+}
+function setWeight(k, v) {
+  cls().weights[k] = Math.max(0, Math.min(5, Number(v) || 0));
+  saveState(); renderAll();
+}
+function setDraftMode(m) { cls().draftOrderMode = m; saveState(); renderAll(); }
+function addTeam() {
+  const c = cls();
+  const n = c.teams.length;
+  c.teams.push({ id: 't_' + Date.now(), name: `${n + 1}팀`, colorIdx: n % TEAM_COLORS.length });
+  saveState(); renderAll();
+}
+function renameTeam(id, name) {
+  const t = cls().teams.find(x => x.id === id);
+  if (t && name.trim()) { t.name = name.trim(); saveState(); renderAll(); }
+}
+async function removeTeam(id) {
+  const c = cls();
+  if (c.teams.length <= 2) return;
+  if (!await askConfirm('팀을 삭제할까요? 소속 학생은 미배정으로 돌아갑니다.')) return;
+  c.students.forEach(s => { if (s.teamId === id) { s.teamId = null; s.isCaptain = false; } });
+  c.teams = c.teams.filter(t => t.id !== id);
+  saveState(); renderAll();
+}
+
+/* =========================================================
+ * 9. 리그전 (풀리그 대진 · 경기 기록 · 순위)
+ * ========================================================= */
+const matchKey = (a, b) => [a, b].sort().join('__');
+
+// 4팀: 얼티미트 리그와 동일한 고정 대진(1-2, 3-4, 1-3, 2-4, 1-4, 2-3) / 그 외: 라운드로빈 자동 생성
+function getSchedule(c) {
+  const T = c.teams;
+  let pairs = [];
+  if (T.length === 4) {
+    pairs = [[0, 1, 1], [2, 3, 1], [0, 2, 2], [1, 3, 2], [0, 3, 3], [1, 2, 3]];
+  } else {
+    const idx = T.map((_, i) => i);
+    if (idx.length % 2) idx.push(null);
+    const n = idx.length;
+    for (let r = 0; r < n - 1; r++) {
+      for (let i = 0; i < n / 2; i++) {
+        const a = idx[i], b = idx[n - 1 - i];
+        if (a !== null && b !== null) pairs.push([Math.min(a, b), Math.max(a, b), r + 1]);
+      }
+      idx.splice(1, 0, idx.pop());
+    }
+  }
+  return pairs.map(([a, b, round], i) => ({ no: i + 1, round, a: T[a], b: T[b], key: matchKey(T[a].id, T[b].id) }));
+}
+
+function matchResult(c, m) {
+  const rec = c.matches[m.key];
+  if (!rec || !rec.stats) return null;
+  let sa = 0, sb = 0, mvp = null;
+  const sf = scoreFields(c);
+  Object.entries(rec.stats).forEach(([sid, st]) => {
+    const g = sumFields(st, sf);
+    if (st.teamId === m.a.id) sa += g; else if (st.teamId === m.b.id) sb += g;
+    if (st.mvp) mvp = sid;
+  });
+  return { sa, sb, mvp, rec };
+}
+
+function computeStandings(c, schedule) {
+  const tbl = {};
+  c.teams.forEach(t => tbl[t.id] = { t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
+  schedule.forEach(m => {
+    const r = matchResult(c, m);
+    if (!r) return;
+    const A = tbl[m.a.id], B = tbl[m.b.id];
+    A.p++; B.p++; A.gf += r.sa; A.ga += r.sb; B.gf += r.sb; B.ga += r.sa;
+    if (r.sa > r.sb) { A.w++; A.pts += 2; B.l++; }
+    else if (r.sa < r.sb) { B.w++; B.pts += 2; A.l++; }
+    else { A.d++; B.d++; A.pts++; B.pts++; }
+  });
+  return Object.values(tbl).map(x => ({ ...x, gd: x.gf - x.ga }))
+    .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+}
+
+function playerTotals(c) {
+  const map = {};
+  const fs = statFields(c), pf = pointFields(c);
+  c.students.forEach(s => map[s.id] = { s, games: 0, v: Object.fromEntries(fs.map(f => [f.id, 0])), pts: 0, mvp: 0, teams: new Set() });
+  Object.values(c.matches).forEach(rec => {
+    Object.entries(rec.stats || {}).forEach(([sid, st]) => {
+      const p = map[sid];
+      if (!p) return;
+      p.games++;
+      fs.forEach(f => p.v[f.id] += Number(st[f.id]) || 0);
+      p.pts += sumFields(st, pf);
+      if (st.mvp) p.mvp++;
+      if (st.teamId) p.teams.add(st.teamId);
+    });
+  });
+  return map;
+}
+
+function renderLeague() {
+  const c = cls();
+  const sch = getSchedule(c);
+  const standings = computeStandings(c, sch);
+  const done = sch.filter(m => matchResult(c, m)).length;
+  const studentById = id => c.students.find(s => s.id === id);
+  document.getElementById('leagueTitle').textContent = `${c.name} 리그 순위표`;
+  document.getElementById('scheduleInfo').textContent = `${c.teams.length}팀 풀리그 · 총 ${sch.length}경기 중 ${done}경기 완료`;
+
+  document.getElementById('standingsTable').innerHTML = `
+    <table>
+      <thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득점</th><th>실점</th><th>득실차</th><th>승점</th></tr></thead>
+      <tbody>${standings.map((s, i) => `<tr>
+        <td><span class="rank-badge ${s.p && i < 3 ? 'rank-' + (i + 1) : ''}">${i + 1}</span></td>
+        <td style="--c:${teamColor(s.t)}"><span class="dot"></span><b>${esc(s.t.name)}</b></td>
+        <td>${s.p}</td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td><td>${s.gf}</td><td>${s.ga}</td>
+        <td>${s.gd > 0 ? '+' + s.gd : s.gd}</td>
+        <td><b style="color:var(--primary); font-size:1.05rem;">${s.pts}</b></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+
+  const hasPlayers = c.students.some(s => s.teamId);
+  document.getElementById('matchList').innerHTML = (!hasPlayers ? '<p class="small muted" style="margin-bottom:10px;">먼저 [1. 팀 드래프트]에서 팀을 구성하세요. 팀원 명단이 경기 기록 입력창에 자동으로 표시됩니다.</p>' : '') +
+    sch.map(m => {
+      const r = matchResult(c, m);
+      let detail = '';
+      if (r) {
+        const sf = scoreFields(c);
+        const scorers = Object.entries(r.rec.stats).filter(([, st]) => sumFields(st, sf) > 0)
+          .map(([sid, st]) => { const s = studentById(sid); return s ? `${esc(s.name)} ${sumFields(st, sf)}` : null; }).filter(Boolean);
+        const mvp = r.mvp && studentById(r.mvp);
+        detail = `<div class="match-detail">
+          ${mvp ? `<span class="badge-mvp">MVP</span> <b>${esc(mvp.name)}</b> &nbsp;·&nbsp; ` : ''}
+          ${esc(sf.map(f => f.name).join('+') || '득점')}: ${scorers.length ? scorers.join(', ') : '없음'}
+          ${r.rec.memo ? ` &nbsp;·&nbsp; 메모: ${esc(r.rec.memo)}` : ''}
+        </div>`;
+      }
+      return `
+        <div class="match-item ${r ? 'done' : ''}">
+          <div class="match-main">
+            <div class="m-no"><span class="tag">${m.no}경기</span> <span class="small muted">${m.round}R</span></div>
+            <div class="ta" style="color:${teamColor(m.a)}">${esc(m.a.name)}</div>
+            <div class="score-text">${r ? `${r.sa} : ${r.sb}` : '- : -'}</div>
+            <div class="tb" style="color:${teamColor(m.b)}">${esc(m.b.name)}</div>
+            <div class="m-btn" style="text-align:right;">
+              <button class="${r ? 'outline' : 'accent'} sm" onclick="openMatchModal('${m.key}')">${r ? '기록 수정' : '기록 입력'}</button>
+            </div>
+          </div>
+          ${detail}
+        </div>`;
+    }).join('');
+
+  // 개인 누적 기록
+  const totals = Object.values(playerTotals(c)).filter(p => p.games > 0 || p.s.teamId);
+  const fs = statFields(c), sf0 = scoreFields(c);
+  totals.sort((a, b) => b.pts - a.pts || sumFields(b.v, sf0) - sumFields(a.v, sf0) || b.mvp - a.mvp || a.s.num - b.s.num);
+  const tName = id => esc(c.teams.find(t => t.id === id)?.name || '-');
+  document.getElementById('playerStatsTable').innerHTML = totals.length ? `
+    <table>
+      <thead><tr><th>번호</th><th>이름</th><th>팀</th><th>출전</th>${fs.map(f => `<th>${esc(f.name)}</th>`).join('')}${pointFields(c).length ? '<th>공격포인트</th>' : ''}<th>MVP</th></tr></thead>
+      <tbody>${totals.map(p => `<tr>
+        <td>${p.s.num}</td><td>${esc(p.s.name)}${p.s.isCaptain ? ' 👑' : ''}</td><td>${tName(p.s.teamId)}</td>
+        <td>${p.games}</td>${fs.map(f => `<td>${f.score && p.v[f.id] ? '<b>' + p.v[f.id] + '</b>' : p.v[f.id]}</td>`).join('')}${pointFields(c).length ? `<td>${p.pts}</td>` : ''}
+        <td>${p.mvp ? `<span class="badge-mvp">${p.mvp}회</span>` : '-'}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : '<div class="empty">아직 기록이 없습니다.</div>';
+}
+
+function openMatchModal(key) {
+  const c = cls();
+  const m = getSchedule(c).find(x => x.key === key);
+  if (!m) return;
+  const rec = c.matches[key];
+  const ex = rec?.stats || {};
+  // 현재 팀원 + (팀 이동 등으로 빠졌지만) 이 경기 기록이 남아 있는 학생
+  const rosterOf = team => {
+    const ids = new Set(c.students.filter(s => s.teamId === team.id).map(s => s.id));
+    Object.entries(ex).forEach(([sid, st]) => { if (st.teamId === team.id) ids.add(sid); });
+    return [...ids].map(id => c.students.find(s => s.id === id)).filter(Boolean).sort((a, b) => (b.isCaptain - a.isCaptain) || a.num - b.num);
+  };
+  const row = (s, team) => {
+    const v = ex[s.id] || {};
+    return `<tr>
+      <td class="left"><b>${esc(s.name)}</b>${s.isCaptain ? ' 👑' : ''} <span class="rec">${s.num}번</span></td>
+      ${statFields(c).map(f => `<td><input class="num st-in" type="number" min="0" data-id="${s.id}" data-team="${team.id}" data-f="${esc(f.id)}" data-score="${f.score ? 1 : ''}" value="${v[f.id] || 0}" oninput="updateModalScore()"></td>`).join('')}
+      <td><input type="radio" name="mvp" value="${s.id}" ${v.mvp ? 'checked' : ''} style="transform:scale(1.2); accent-color:#f59e0b;"></td>
+    </tr>`;
+  };
+  const teamTable = team => {
+    const list = rosterOf(team);
+    return `<div>
+      <h4 style="color:${teamColor(team)}; margin-bottom:6px;">${esc(team.name)} <span class="score-text" id="sc_${team.id}" style="font-size:1.1rem;"></span></h4>
+      ${list.length ? `<table><thead><tr><th class="left">선수</th>${statFields(c).map(f => `<th>${esc(f.name)}</th>`).join('')}<th>MVP</th></tr></thead>
+        <tbody>${list.map(s => row(s, team)).join('')}</tbody></table>` : '<div class="empty">팀원이 없습니다. 먼저 드래프트를 진행하세요.</div>'}
+    </div>`;
+  };
+  openModal(`
+    <div class="modal-head">
+      <h3>${esc(c.name)} · ${m.no}경기 ${esc(m.a.name)} vs ${esc(m.b.name)}</h3>
+      <button class="outline sm" onclick="closeModal()">닫기</button>
+    </div>
+    <p class="small muted" style="margin-bottom:10px;">${scoreFields(c).length ? `팀 점수 = 개인 <b>${esc(scoreFields(c).map(f => f.name).join(' + '))}</b> 합계로 자동 계산됩니다.` : '<b>팀 점수에 합산되는 항목이 없습니다.</b> [⚙ 기록 항목 편집]에서 지정하세요.'}
+      ${statFields(c).filter(f => f.desc).map(f => `${esc(f.name)} = ${esc(f.desc)}`).join(' · ')}</p>
+    <div class="grid-2">${teamTable(m.a)}${teamTable(m.b)}</div>
+    <div class="row" style="margin-top:12px;">
+      <label class="small"><input type="radio" name="mvp" value="" ${!Object.values(ex).some(x => x.mvp) ? 'checked' : ''}> MVP 없음</label>
+      <input type="text" id="matchMemo" placeholder="경기 메모 (선택)" value="${esc(rec?.memo || '')}" style="flex:1; min-width:200px;">
+    </div>
+    <div class="modal-foot">
+      ${rec ? `<button class="danger" onclick="clearMatch('${key}')" style="margin-right:auto;">기록 삭제</button>` : ''}
+      <button class="outline" onclick="closeModal()">취소</button>
+      <button class="accent" onclick="saveMatch('${key}')">저장</button>
+    </div>`, true);
+  updateModalScore();
+}
+
+/* ---------- 리그 기록 항목 편집 ---------- */
+function statEditRow(f) {
+  return `<tr data-id="${esc(f.id)}">
+    <td><div class="ord">
+      <button type="button" class="outline sm" onclick="moveRoleRow(this,-1)">▲</button>
+      <button type="button" class="outline sm" onclick="moveRoleRow(this,1)">▼</button>
+    </div></td>
+    <td><input type="text" class="se-name" value="${esc(f.name)}" placeholder="예: 득점, 블록, 터치다운"></td>
+    <td style="text-align:center;"><input type="checkbox" class="se-score" ${f.score ? 'checked' : ''}></td>
+    <td style="text-align:center;"><input type="checkbox" class="se-point" ${f.point ? 'checked' : ''}></td>
+    <td><input type="text" class="se-desc" value="${esc(f.desc || '')}" placeholder="기록 기준 (선택)"></td>
+    <td><textarea class="se-comment" placeholder="생기부 문구, {n} = 누적 횟수">${esc(f.comment || '')}</textarea></td>
+    <td><button type="button" class="link" style="color:var(--danger)" onclick="this.closest('tr').remove()">삭제</button></td>
+  </tr>`;
+}
+function openStatEditor() {
+  const c = cls();
+  openModal(`
+    <div class="modal-head"><h3>리그전 기록 항목 편집 · ${esc(c.name)}</h3><button class="outline sm" onclick="closeModal()">닫기</button></div>
+    <p class="small muted" style="margin-bottom:10px;">
+      경기 기록 입력창·개인 누적 기록·생기부 CSV의 열이 이 목록대로 바뀝니다.<br>
+      <b>팀 점수</b>에 체크한 항목의 합이 경기 점수가 되고, <b>공격포인트</b>에 체크한 항목의 합으로 개인 순위를 정합니다.<br>
+      항목을 삭제해도 이미 입력한 값은 지워지지 않아서, 같은 항목을 다시 추가하지 않는 한 화면에만 보이지 않습니다.
+    </p>
+    <div class="table-wrap">
+      <table class="role-edit">
+        <thead><tr><th>순서</th><th style="width:15%">항목 이름</th><th>팀 점수</th><th>공격<br>포인트</th><th style="width:20%">기록 기준</th><th>생기부 문구</th><th></th></tr></thead>
+        <tbody id="statEditBody">${c.statFields.map(statEditRow).join('')}</tbody>
+      </table>
+    </div>
+    <div class="row between" style="margin-top:10px;">
+      <button type="button" class="accent sm" onclick="addStatRow()">+ 항목 추가</button>
+      <button type="button" class="outline sm" onclick="document.getElementById('statEditBody').innerHTML = defaultStatFields().map(statEditRow).join('')">기본 항목(득점·어시스트·수비)으로 되돌리기</button>
+    </div>
+    <label class="small" style="display:block; margin-top:12px;"><input type="checkbox" id="statApplyAll"> 다른 학급(${appState.classes.length - 1}개)에도 같은 항목 적용</label>
+    <div class="modal-foot">
+      <button class="outline" onclick="closeModal()">취소</button>
+      <button class="accent" onclick="saveStatEditor()">저장</button>
+    </div>`, true);
+}
+function addStatRow() {
+  const body = document.getElementById('statEditBody');
+  body.insertAdjacentHTML('beforeend', statEditRow({ id: 'f_' + Date.now().toString(36), name: '', score: false, point: false, desc: '', comment: '' }));
+  body.lastElementChild.querySelector('.se-name').focus();
+}
+function saveStatEditor() {
+  const fields = [];
+  for (const tr of document.querySelectorAll('#statEditBody tr')) {
+    const name = tr.querySelector('.se-name').value.trim();
+    if (!name) { toast('항목 이름이 비어 있는 줄이 있습니다.', true); tr.querySelector('.se-name').focus(); return; }
+    fields.push({ id: tr.dataset.id, name, score: tr.querySelector('.se-score').checked, point: tr.querySelector('.se-point').checked,
+                  desc: tr.querySelector('.se-desc').value.trim(), comment: tr.querySelector('.se-comment').value.trim() });
+  }
+  if (!fields.length) { toast('기록 항목이 최소 1개는 있어야 합니다.', true); return; }
+  const targets = document.getElementById('statApplyAll').checked ? appState.classes : [cls()];
+  targets.forEach(c => c.statFields = fields.map(f => ({ ...f })));
+  saveState(); closeModal(); renderAll();
+  if (!fields.some(f => f.score)) toast('팀 점수에 합산되는 항목이 없어 모든 경기가 0:0으로 표시됩니다.', true);
+  else toast(`기록 항목 ${fields.length}개를 저장했습니다${targets.length > 1 ? ` (${targets.length}개 학급)` : ''}.`);
+}
+
+function updateModalScore() {
+  const sums = {};
+  document.querySelectorAll('.st-in[data-score="1"]').forEach(i => { sums[i.dataset.team] = (sums[i.dataset.team] || 0) + (Number(i.value) || 0); });
+  document.querySelectorAll('[id^="sc_"]').forEach(el => { el.textContent = (sums[el.id.slice(3)] || 0) + '점'; });
+}
+
+function saveMatch(key) {
+  const c = cls();
+  const stats = {};
+  document.querySelectorAll('.st-in').forEach(i => {
+    const id = i.dataset.id;
+    if (!stats[id]) stats[id] = { ...(c.matches[key]?.stats?.[id] || {}), mvp: false, teamId: i.dataset.team };
+    stats[id][i.dataset.f] = Math.max(0, Number(i.value) || 0);
+  });
+  const mvp = document.querySelector('input[name="mvp"]:checked')?.value;
+  if (mvp && stats[mvp]) stats[mvp].mvp = true;
+  if (!Object.keys(stats).length) { toast('기록할 선수가 없습니다. 먼저 팀을 구성하세요.', true); return; }
+  c.matches[key] = { stats, memo: document.getElementById('matchMemo').value.trim(), savedAt: new Date().toISOString() };
+  saveState(); closeModal(); renderAll(); toast('경기 기록을 저장했습니다.');
+}
+
+async function clearMatch(key) {
+  if (!await askConfirm('이 경기 기록을 삭제할까요?')) return;
+  delete cls().matches[key];
+  saveState(); closeModal(); renderAll();
+}
+
+// 생기부 참고용 CSV (현재 학급)
+function exportLeagueCSV() {
+  const c = cls();
+  if (!c.students.length) { toast('학생 명단이 없습니다.', true); return; }
+  const totals = playerTotals(c);
+  const tName = id => c.teams.find(t => t.id === id)?.name || '';
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const fs = statFields(c);
+  let csv = '﻿' + ['학급', '번호', '이름', '팀', '역할', '출전', ...fs.map(f => f.name), 'MVP', '생기부 참고 문구'].map(q).join(',') + '\n';
+  c.students.slice().sort((a, b) => a.num - b.num).forEach(s => {
+    const p = totals[s.id];
+    let role = s.isCaptain ? '팀장' : s.teamId ? '선수' : s.nonPlayerRole ? roleName(s.nonPlayerRole) : '미배정';
+    let comment = '';
+    if (s.nonPlayerRole) comment = roleOf(s.nonPlayerRole, c)?.comment || '';
+    else if (p.games > 0) {
+      const desc = [];
+      if (s.isCaptain) desc.push('팀장으로서 작전 회의를 주도하고 팀원들의 역할을 조율함');
+      fs.forEach(f => { if (p.v[f.id] && f.comment) desc.push(f.comment.replace(/\{n\}/g, p.v[f.id])); });
+      if (p.mvp) desc.push(`경기 MVP에 ${p.mvp}회 선정되며 팀의 중심 역할을 수행함`);
+      comment = `리그전(${tName(s.teamId) || '팀'}) ${p.games}경기에 출전하여 ` +
+        (desc.length ? desc.join(', ') + '.' : '경기 전반에 성실하고 적극적으로 참여하며 팀원 간 협동과 페어플레이를 실천함.');
+    }
+    csv += [c.name, s.num, s.name, tName(s.teamId), role, p.games, ...fs.map(f => p.v[f.id]), p.mvp, comment].map(q).join(',') + '\n';
+  });
+  download(`${safeFile(c.name)}_리그전_생기부자료_${today()}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+/* =========================================================
+ * 10. 내보내기 · 백업 · 복원
+ * ========================================================= */
+function exportTeamResult() {
+  const c = cls();
+  if (!c.students.length) { toast('저장할 학생 데이터가 없습니다.', true); return; }
+  const rows = c.students.map(s => {
+    const team = c.teams.find(t => t.id === s.teamId);
+    const cheer = c.teams.find(t => t.id === s.cheerTeamId);
+    return {
+      '구분': team ? team.name : s.nonPlayerRole ? `[비선수] ${roleName(s.nonPlayerRole)}${cheer ? ` (${cheer.name} 응원)` : ''}` : '미배정',
+      '직책': s.isCaptain ? '팀장' : s.nonPlayerRole ? roleName(s.nonPlayerRole) : '선수',
+      '번호': s.num, '성명': s.name, '익명코드': codeOf(s),
+      '종합(가중치)': totalScore(s), 'PAPS원점수': papsRaw(s), 'PAPS등급': gradeOf(papsRaw(s)) + '등급',
+      '심폐지구력': s.cardio, '왕복오래달리기(회)': s.cardioRec, '유연성': s.flex, '앉아윗몸앞으로굽히기(cm)': s.flexRec,
+      '근력': s.strength, '악력(kg)': s.strengthRec, '순발력': s.power, '제자리멀리뛰기(cm)': s.powerRec,
+      'BMI점수': s.bmi, '실기보정': s.bonus || 0
+    };
+  }).sort((a, b) => String(a['구분']).localeCompare(String(b['구분'])) || (a['직책'] === '팀장' ? -1 : b['직책'] === '팀장' ? 1 : 0) || a['번호'] - b['번호']);
+  const fname = `${safeFile(c.name)}_팀편성결과_${today()}`;
+  if (typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '팀편성');
+    download(fname + '.xlsx', new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]));
+  } else {
+    const keys = Object.keys(rows[0]);
+    const csv = '﻿' + keys.join(',') + '\n' + rows.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    download(fname + '.csv', csv, 'text/csv;charset=utf-8');
+  }
+}
+
+function backupData() {
+  download(`PAPS팀리그_백업_${today()}.json`, JSON.stringify(appState, null, 2), 'application/json');
+}
+function restoreData() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = async ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (!parsed || !Array.isArray(parsed.classes) || !parsed.classes.length) throw new Error('형식 오류');
+        if (!await askConfirm('현재 데이터를 백업 파일로 교체할까요?')) return;
+        appState = normalizeState(parsed);
+        saveState(); renderAll(); toast('복원 완료');
+      } catch (err) { toast('백업 파일 형식이 올바르지 않습니다.', true); }
+    };
+    r.readAsText(f);
+  };
+  input.click();
+}
+
+/* 시작 */
+window.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  setupDragAndDrop();
+  renderAll();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('askBack').style.display !== 'block') closeModal(); });
+</script>
+</body>
+</html>
