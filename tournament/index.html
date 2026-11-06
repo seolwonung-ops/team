@@ -101,6 +101,7 @@ body.big .groups{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .cell.done .out{border-top-width:3px}.cell.done .vu,.cell.done .vd{border-right-width:3px}
 .cell.fed .inl{border-color:var(--acc);border-top-width:3px}
 .cell.hid{visibility:hidden}
+.match.single .slot{border-bottom:none;background:#fff;font-weight:700}.match.single .slot .n::after{content:none}.byetag{font-size:.72em;color:var(--sub);padding:2px 9px 6px;background:#fff}
 .eslot{cursor:pointer;background:#fffdf3}.eslot .nmEdit{flex:1;min-width:0;width:auto;font-weight:700;padding:4px 6px;text-align:left}
 .eslot .swap{color:var(--sub);font-size:1.1em;padding:0 4px}.eslot.esel{outline:3px solid #e8a500;outline-offset:-3px;background:#fff3c4}
 .round.pre h3{color:#b5462f}
@@ -226,7 +227,7 @@ th{color:var(--sub);font-size:.85em}
     </div>
     <div class="row" style="gap:14px">
       <div class="seg" id="segType"><button data-v="single">토너먼트</button><button data-v="league">리그전</button></div>
-      <label id="sizeW" class="hint">시작 <select id="bsize"><option value="auto">자동</option><option value="64">64강</option><option value="32">32강</option><option value="16">16강</option><option value="8">8강</option><option value="4">4강</option></select></label>
+      <label id="sizeW" class="hint">시작 <select id="bsize"><option value="auto">자동 (팀 수대로)</option><option value="64">64강</option><option value="32">32강</option><option value="16">16강</option><option value="8">8강</option><option value="4">4강</option></select></label>
       <label id="byeW" class="hint">부전승 <select id="byePos"><option value="edges">양쪽 끝</option><option value="spread">고르게</option></select></label>
       <label id="thirdW"><input type="checkbox" id="third" checked> 3·4위전</label>
       <label id="avoidW"><input type="checkbox" id="avoid" checked> 1라운드 같은 팀끼리 피하기</label>
@@ -575,7 +576,8 @@ function resolve(){const T=S.tour;if(!T||T.type!=='single')return;const R=T.roun
   if(T.third){const sf=R[R.length-2],lo=m=>(m.w===null||m.a===null||m.b===null)?null:(m.w===m.a?m.b:m.a);T.third.a=lo(sf[0]);T.third.b=lo(sf[1]);fix(T.third);}}
 const rName=t=>t===2?'결승':t===4?'준결승':t+'강';
 const prelimN=T=>{const P=T.rounds[0].length*2,m=T.main||P;return Math.round(Math.log2(P/m));};
-const rLabel=(T,r)=>{const P=T.rounds[0].length*2,k=prelimN(T);return r<k?(k===1?'예선':`예선 ${r+1}차`):rName(P/2**r);};
+const nStart=T=>{const P=T.rounds[0].length*2,n=T.names.length;return !prelimN(T)&&n<P&&n>P/2?n:0;};
+const rLabel=(T,r)=>{const P=T.rounds[0].length*2,k=prelimN(T);if(r===0&&nStart(T))return nStart(T)===2?'결승':nStart(T)+'강';return r<k?(k===1?'예선':`예선 ${r+1}차`):rName(P/2**r);};
 const nm=i=>i===-1?'부전승':i===null||i===undefined?'대기':S.tour.names[i];
 const pc=i=>{if(!(i>=0))return'transparent';const g=S.groups.find(g=>g.name===S.tour.names[i]);return g?colorOf(g):'transparent';};
 let editMode=false,eSel=null;
@@ -592,12 +594,14 @@ function renderTour(){const T=S.tour,box=$('#tourBox');$('#editTour').style.disp
   if(!T){box.innerHTML=S.tc.src==='custom'?'<div class="empty">위에 참가팀(예: 1반, 2반…)을 적고 <b>🎲 이 팀들로 대진표 만들기</b>를 누르세요.</div>':'<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.<br>반 대항전처럼 팀을 직접 넣으려면 위에서 <b>✏️ 직접 입력</b>을 고르세요.</div>';$('#tourHint').textContent='';return;}
   if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>(m.a===-1)!==(m.b===-1)).length;
     const k=prelimN(T),pre=R.slice(0,k).flat().filter(m=>m.a!==-1&&m.b!==-1).length;
-    $('#tourHint').textContent=`${T.names.length}팀 · `+(k?`예선 ${pre}경기 → ${rName(T.main)}`:`${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''}`)+` ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
+    $('#tourHint').textContent=`${T.names.length}팀 · `+(k?`예선 ${pre}경기 → ${rName(T.main)}`:nStart(T)?`${nStart(T)}강부터 · 1라운드 ${R[0].length-byes}경기, 부전승 ${byes}팀`:`${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''}`)+` ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
     box.innerHTML=(f.w>=0&&f.w!==null?`<div class="champ">🏆 ${esc(nm(f.w))} &nbsp;·&nbsp; 🥈 ${esc(nm(f.w===f.a?f.b:f.a))}${T.third&&T.third.w>=0&&T.third.w!==null?` &nbsp;·&nbsp; 🥉 ${esc(nm(T.third.w))}`:''}</div>`:'')
       +'<div class="bracket">'+R.map((rd,r)=>{const last=r===R.length-1;
         return `<div class="round${last?' final':''}${r<k?' pre':''}"><h3>${rLabel(T,r)}</h3><div class="ms">${rd.map((m,i)=>{
           const bye=m.a===-1||m.b===-1,done=m.w!==null&&m.w!==-1,fed=r>0&&(m.a!==null||m.b!==null);
           const lines=(r>0?'<i class="ln inl"></i>':'')+(last?'':`<i class="ln out"></i><i class="ln ${i%2?'vd':'vu'}"></i>`);
+          const one=r===0&&!k&&!editMode&&nStart(T)&&(m.a===-1)!==(m.b===-1);
+          if(one){const sd=m.a===-1?'b':'a';return `<div class="cell byeone${done?' done':''}">${lines}<div class="match single"><div class="slot" style="--c:${pc(m[sd])}"><span class="n">${esc(nm(m[sd]))}${S.tour.subs[m[sd]]?`<small>${esc(S.tour.subs[m[sd]])}</small>`:''}</span></div><div class="byetag">부전승 → 다음 라운드</div></div></div>`;}
           return `<div class="cell${bye?' bye':''}${!editMode&&((bye&&r<k)||(m.a===-1&&m.b===-1))?' hid':''}${done?' done':''}${fed?' fed':''}">${lines}<div class="match">${slot(m,'a',r+'-'+i)}${slot(m,'b',r+'-'+i)}</div></div>`;}).join('')}</div></div>`;}).join('')
       +(T.third?`<div class="round third"><h3>3·4위전</h3><div class="ms"><div class="cell"><div class="match">${slot(T.third,'a','third')}${slot(T.third,'b','third')}</div></div></div></div>`:'')+'</div>';
   }else{const st=standings();$('#tourHint').textContent=`${T.names.length}팀 리그전 · ${T.rounds.reduce((a,r)=>a+r.length,0)}경기 — 점수를 입력하면 순위가 바로 바뀝니다`;
