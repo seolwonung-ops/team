@@ -14,7 +14,7 @@ header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;display:
 header h1{font-size:1.05em;margin:0 10px 0 0}
 .sync{font-size:.8em;padding:5px 10px;border-radius:999px;background:#ffffff1a;color:#ffffffc0;white-space:nowrap}
 .sync.on{background:#1f7a4d;color:#fff}.sync.ro{background:#2f6fb5;color:#fff}.sync.warn{background:#b5462f;color:#fff}
-.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #sizeW,.ro #segSrc,.ro #customWrap,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
+.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #sizeW,.ro #byeW,.ro #editTour,.ro #segSrc,.ro #customWrap,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
 .ro .slot,.ro .mem,.ro .grp,.ro .lg-m input,.ro .slot input,.ro .grp input{pointer-events:none}
 .ro .slot input,.ro .lg-m input{border-color:transparent;background:transparent}
 .wsbar{flex-basis:100%;display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px 0 0;margin-top:2px;border-top:1px solid #ffffff1f}
@@ -101,6 +101,8 @@ body.big .groups{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .cell.done .out{border-top-width:3px}.cell.done .vu,.cell.done .vd{border-right-width:3px}
 .cell.fed .inl{border-color:var(--acc);border-top-width:3px}
 .cell.hid{visibility:hidden}
+.eslot{cursor:pointer;background:#fffdf3}.eslot .nmEdit{flex:1;min-width:0;width:auto;font-weight:700;padding:4px 6px;text-align:left}
+.eslot .swap{color:var(--sub);font-size:1.1em;padding:0 4px}.eslot.esel{outline:3px solid #e8a500;outline-offset:-3px;background:#fff3c4}
 .round.pre h3{color:#b5462f}
 .round.third{margin-left:10px;padding-left:16px;border-left:2px dashed var(--line)}
 .round.final .match{border:2px solid #e8c547;box-shadow:0 2px 10px #e8c54740}
@@ -225,12 +227,14 @@ th{color:var(--sub);font-size:.85em}
     <div class="row" style="gap:14px">
       <div class="seg" id="segType"><button data-v="single">토너먼트</button><button data-v="league">리그전</button></div>
       <label id="sizeW" class="hint">시작 <select id="bsize"><option value="auto">자동</option><option value="64">64강</option><option value="32">32강</option><option value="16">16강</option><option value="8">8강</option><option value="4">4강</option></select></label>
+      <label id="byeW" class="hint">부전승 <select id="byePos"><option value="edges">양쪽 끝</option><option value="spread">고르게</option></select></label>
       <label id="thirdW"><input type="checkbox" id="third" checked> 3·4위전</label>
       <label id="avoidW"><input type="checkbox" id="avoid" checked> 1라운드 같은 팀끼리 피하기</label>
       <span id="ptsW" class="hint">승점 승<input type="number" id="pW" value="3" style="width:52px"> 무<input type="number" id="pD" value="1" style="width:52px"> 패<input type="number" id="pL" value="0" style="width:52px"></span>
       <div class="sp"></div>
       <button class="btn" id="resetRes">결과 지우기</button>
       <button class="btn" id="copyTour">📋 복사</button>
+ <button class="btn" id="editTour">✏️ 대진 수정</button>
       <button class="pri" id="makeTour" style="padding:9px 16px;font-size:.95em">🎲 대진 다시 뽑기</button>
     </div>
     <div class="hint" id="tourHint" style="margin-top:8px"></div>
@@ -271,7 +275,7 @@ const natCmp=(a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true});
 const COLORS=['#2563eb','#0d9488','#d97706','#e11d48','#7c3aed','#059669','#db2777','#4b5563','#ca8a04','#0891b2'];
 
 const def=()=>({id:uid(),title:'',text:'',size:2,keepTeam:true,keepCls:true,rem:'spread',ranges:[],seps:'',balance:false,groups:[],tour:null,
-  tc:{type:'single',third:true,avoid:true,pts:[3,1,0],src:'groups',custom:'',size:'auto'}});
+  tc:{type:'single',third:true,avoid:true,pts:[3,1,0],src:'groups',custom:'',size:'auto',bye:'edges'}});
 const KEY3='groupTourMaker_v3';
 let DB=null;try{DB=JSON.parse(localStorage.getItem(KEY3));}catch(e){}
 if(!DB||!Array.isArray(DB.ws)||!DB.ws.length){let old=null;try{old=JSON.parse(localStorage.getItem(KEY));}catch(e){}
@@ -532,23 +536,29 @@ function syncT(){const c=S.tc;c.src=c.src||'groups';$$('#segSrc button').forEach
   $('#customInfo').textContent=c.src==='custom'?`${customNames().length}팀`:'';
   $$('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.type));
   $('#third').checked=c.third;$('#avoid').checked=c.avoid;[$('#pW').value,$('#pD').value,$('#pL').value]=c.pts;
-  $('#thirdW').style.display=$('#sizeW').style.display=c.type==='single'?'':'none';$('#bsize').value=String(c.size||'auto');$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
+  $('#thirdW').style.display=$('#sizeW').style.display=c.type==='single'?'':'none';$('#bsize').value=String(c.size||'auto');$('#byePos').value=c.bye||'edges';$('#byeW').style.display=c.type==='single'?'':'none';
+  $('#editTour').style.display=c.type==='single'&&S.tour&&S.tour.type==='single'?'':'none';$('#editTour').textContent=editMode?'✔ 수정 끝내기':'✏️ 대진 수정';$('#editTour').classList.toggle('pri',editMode);$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
 $('#segSrc').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.src)return;S.tc.src=b.dataset.v;save();syncT();makeTour();};
 $('#custom').addEventListener('input',e=>{S.tc.custom=e.target.value;save();$('#customInfo').textContent=`${customNames().length}팀`;});
 $('#fillCls').onclick=()=>{let a=+$('#clsFrom').value||1,b=+$('#clsTo').value||a;if(a>b)[a,b]=[b,a];if(b-a>63)return toast('최대 64팀까지');
   S.tc.custom=Array.from({length:b-a+1},(_,i)=>`${a+i}반`).join('\n');$('#custom').value=S.tc.custom;save();syncT();};
 $('#makeCustom').onclick=()=>{if(customNames().length<2)return toast('팀을 2개 이상 적어 주세요');makeTour();toast('대진표를 만들었습니다');};
+$('#byePos').onchange=e=>{S.tc.bye=e.target.value;save();makeTour();toast('부전승 위치를 바꿔 대진을 새로 짰습니다');};
+$('#editTour').onclick=()=>{editMode=!editMode;eSel=null;syncT();renderTour();if(editMode)toast('팀 이름을 고치거나, 두 칸을 차례로 눌러 자리를 바꾸세요');};
 $('#bsize').onchange=e=>{S.tc.size=e.target.value==='auto'?'auto':+e.target.value;save();makeTour();toast('시작 라운드를 바꿔 대진을 새로 짰습니다');};
 $('#segType').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.type)return;S.tc.type=b.dataset.v;syncT();makeTour();};
 ['third','avoid','pW','pD','pL'].forEach(id=>$('#'+id).addEventListener('change',()=>{const c=S.tc;c.third=$('#third').checked;c.avoid=$('#avoid').checked;c.pts=[+$('#pW').value,+$('#pD').value,+$('#pL').value];save();
   if(id==='third'||id==='avoid')makeTour();else renderTour();}));
 function seedOrder(P){let a=[1];while(a.length<P){const L=a.length*2;a=a.flatMap(x=>[x,L+1-x]);}return a;}
-function makeTour(){
+function makeTour(){eSel=null;
   const c=S.tc,ents=c.src==='custom'?customNames().map(name=>({name,sub:'',parent:''}))
     :S.groups.filter(g=>g.id!=='__left'&&g.members.length).map(g=>({name:g.name,sub:g.members.map(label).join('·'),parent:g.parent||''}));
   if(ents.length<2){S.tour=null;save();renderTour();return;}
   const pack=e=>({names:e.map(x=>x.name),subs:e.map(x=>x.sub),parents:e.map(x=>x.parent)});
-  if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const want=c.size==='auto'||!c.size?P:+c.size;if(want>P)P=want;const main=Math.min(want,P);const slots=seedOrder(P).map(sd=>sd<=ents.length?sd-1:-1);
+  if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const want=c.size==='auto'||!c.size?P:+c.size;if(want>P)P=want;const main=Math.min(want,P);const n=ents.length,M=P/2,B=P-n;let slots;
+    if((c.bye||'edges')==='edges'&&B<=M){const byeIdx=new Set();for(let k=0,lo=0,hi=M-1;k<B;k++){byeIdx.add(k%2?hi--:lo++);}
+      slots=[];let t=0;for(let i=0;i<M;i++){if(byeIdx.has(i)){const top=i<M/2;slots.push(top?t++:-1,top?-1:t++);}else{slots.push(t++,t++);}}}
+    else slots=seedOrder(P).map(sd=>sd<=n?sd-1:-1);
     const clash=e=>{let k=0;for(let i=0;i<P/2;i++){const a=slots[2*i],b=slots[2*i+1];if(a>=0&&b>=0&&e[a].parent&&e[a].parent===e[b].parent)k++;}return k;};
     let best=null,bk=1e9;for(let t=0;t<(c.avoid?600:1)&&bk>0;t++){const e=shuffle(ents.slice()),k=c.avoid?clash(e):0;if(k<bk){bk=k;best=e;}}
     const rounds=[Array.from({length:P/2},(_,i)=>({a:slots[2*i],b:slots[2*i+1],w:null,sa:'',sb:''}))];
@@ -568,7 +578,9 @@ const prelimN=T=>{const P=T.rounds[0].length*2,m=T.main||P;return Math.round(Mat
 const rLabel=(T,r)=>{const P=T.rounds[0].length*2,k=prelimN(T);return r<k?(k===1?'예선':`예선 ${r+1}차`):rName(P/2**r);};
 const nm=i=>i===-1?'부전승':i===null||i===undefined?'대기':S.tour.names[i];
 const pc=i=>{if(!(i>=0))return'transparent';const g=S.groups.find(g=>g.name===S.tour.names[i]);return g?colorOf(g):'transparent';};
-function slot(m,side,key){const v=m[side],cls=v===-1?'bye':v===null?'tbd':m.w===null?'':m.w===v?'win':'lose',play=m.a!==null&&m.b!==null&&m.a!==-1&&m.b!==-1,sub=v>=0?S.tour.subs[v]:'';
+let editMode=false,eSel=null;
+function slot(m,side,key){if(editMode&&key.startsWith('0-')){const v=m[side],sel=eSel&&eSel.k===key&&eSel.side===side;
+    return`<div class="slot eslot${sel?' esel':''}${v===-1?' bye':''}" data-k="${key}" data-side="${side}" style="--c:${pc(v)}">${v>=0?`<input class="nmEdit" data-idx="${v}" value="${esc(S.tour.names[v])}">`:'<span class="n">부전승</span>'}<span class="swap" title="눌러서 자리 바꾸기">⇄</span></div>`;}const v=m[side],cls=v===-1?'bye':v===null?'tbd':m.w===null?'':m.w===v?'win':'lose',play=m.a!==null&&m.b!==null&&m.a!==-1&&m.b!==-1,sub=v>=0?S.tour.subs[v]:'';
   return`<div class="slot ${cls}" data-k="${key}" data-side="${side}" style="--c:${pc(v)}"><span class="n">${esc(nm(v))}${v!==null&&v>=0&&m.w===v?' ✔':''}${sub?`<small>${esc(sub)}</small>`:''}</span>${play?`<input inputmode="numeric" data-k="${key}" data-sc="${side==='a'?'sa':'sb'}" value="${esc(m[side==='a'?'sa':'sb'])}" placeholder="-">`:''}</div>`;}
 const getM=k=>k==='third'?S.tour.third:(([r,i])=>S.tour.rounds[r][i])(k.split('-').map(Number));
 const num=v=>v!==''&&v!=null&&!isNaN(+v);
@@ -576,7 +588,7 @@ function standings(){const T=S.tour,[W,D,L]=S.tc.pts,s=T.names.map((name,i)=>({i
   T.rounds.flat().forEach(m=>{if(!num(m.sa)||!num(m.sb))return;const a=s[m.a],b=s[m.b],x=+m.sa,y=+m.sb;a.p++;b.p++;a.gf+=x;a.ga+=y;b.gf+=y;b.ga+=x;
     if(x>y){a.w++;b.l++;a.pts+=W;b.pts+=L;h[m.a+'>'+m.b]=1;}else if(x<y){b.w++;a.l++;b.pts+=W;a.pts+=L;h[m.b+'>'+m.a]=1;}else{a.d++;b.d++;a.pts+=D;b.pts+=D;}});
   return s.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||(h[b.i+'>'+a.i]?1:h[a.i+'>'+b.i]?-1:0));}
-function renderTour(){const T=S.tour,box=$('#tourBox');
+function renderTour(){const T=S.tour,box=$('#tourBox');$('#editTour').style.display=T&&T.type==='single'?'':'none';if(!T||T.type!=='single')editMode=false;$('#editTour').textContent=editMode?'✔ 수정 끝내기':'✏️ 대진 수정';$('#editTour').classList.toggle('pri',editMode);
   if(!T){box.innerHTML=S.tc.src==='custom'?'<div class="empty">위에 참가팀(예: 1반, 2반…)을 적고 <b>🎲 이 팀들로 대진표 만들기</b>를 누르세요.</div>':'<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.<br>반 대항전처럼 팀을 직접 넣으려면 위에서 <b>✏️ 직접 입력</b>을 고르세요.</div>';$('#tourHint').textContent='';return;}
   if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>(m.a===-1)!==(m.b===-1)).length;
     const k=prelimN(T),pre=R.slice(0,k).flat().filter(m=>m.a!==-1&&m.b!==-1).length;
@@ -586,14 +598,20 @@ function renderTour(){const T=S.tour,box=$('#tourBox');
         return `<div class="round${last?' final':''}${r<k?' pre':''}"><h3>${rLabel(T,r)}</h3><div class="ms">${rd.map((m,i)=>{
           const bye=m.a===-1||m.b===-1,done=m.w!==null&&m.w!==-1,fed=r>0&&(m.a!==null||m.b!==null);
           const lines=(r>0?'<i class="ln inl"></i>':'')+(last?'':`<i class="ln out"></i><i class="ln ${i%2?'vd':'vu'}"></i>`);
-          return `<div class="cell${bye?' bye':''}${(bye&&r<k)||(m.a===-1&&m.b===-1)?' hid':''}${done?' done':''}${fed?' fed':''}">${lines}<div class="match">${slot(m,'a',r+'-'+i)}${slot(m,'b',r+'-'+i)}</div></div>`;}).join('')}</div></div>`;}).join('')
+          return `<div class="cell${bye?' bye':''}${!editMode&&((bye&&r<k)||(m.a===-1&&m.b===-1))?' hid':''}${done?' done':''}${fed?' fed':''}">${lines}<div class="match">${slot(m,'a',r+'-'+i)}${slot(m,'b',r+'-'+i)}</div></div>`;}).join('')}</div></div>`;}).join('')
       +(T.third?`<div class="round third"><h3>3·4위전</h3><div class="ms"><div class="cell"><div class="match">${slot(T.third,'a','third')}${slot(T.third,'b','third')}</div></div></div></div>`:'')+'</div>';
   }else{const st=standings();$('#tourHint').textContent=`${T.names.length}팀 리그전 · ${T.rounds.reduce((a,r)=>a+r.length,0)}경기 — 점수를 입력하면 순위가 바로 바뀝니다`;
     box.innerHTML=`<div class="two"><div><h2>순위</h2><table><tr><th>#</th><th>팀</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr>${st.map((s,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(s.name)}</b><div class="hint">${esc(T.subs[s.i]||'')}</div></td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td><td>${s.gf-s.ga>0?'+':''}${s.gf-s.ga}</td><td><b>${s.pts}</b></td></tr>`).join('')}</table></div>
      <div><h2>경기</h2>${T.rounds.map((rd,r)=>`<div style="margin-bottom:10px"><div class="hint"><b>${r+1}라운드</b></div>${rd.map((m,i)=>`<div class="lg-m"><span class="t r">${esc(nm(m.a))}</span><input inputmode="numeric" data-k="${r}-${i}" data-sc="sa" value="${esc(m.sa)}">:<input inputmode="numeric" data-k="${r}-${i}" data-sc="sb" value="${esc(m.sb)}"><span class="t">${esc(nm(m.b))}</span></div>`).join('')}</div>`).join('')}</div></div>`;}}
 $('#tourBox').addEventListener('click',e=>{const T=S.tour;if(!T||T.type!=='single'||e.target.tagName==='INPUT')return;const sl=e.target.closest('.slot');if(!sl)return;
+  if(editMode){if(!sl.classList.contains('eslot'))return;const cur={k:sl.dataset.k,side:sl.dataset.side};
+    if(!eSel){eSel=cur;renderTour();return;}if(eSel.k===cur.k&&eSel.side===cur.side){eSel=null;renderTour();return;}
+    const m1=getM(eSel.k),m2=getM(cur.k),v1=m1[eSel.side],v2=m2[cur.side];m1[eSel.side]=v2;m2[cur.side]=v1;eSel=null;
+    const had=T.rounds.flat().concat(T.third?[T.third]:[]).some(m=>m.sa!==''||m.sb!==''||(m.w!==null&&m.w!==-1&&m.a!==-1&&m.b!==-1));
+    T.rounds.flat().concat(T.third?[T.third]:[]).forEach(m=>{m.w=null;m.sa='';m.sb='';});resolve();save();renderTour();toast(had?'자리를 바꿨습니다 (입력된 결과는 지웠습니다)':'자리를 바꿨습니다');return;}
   const m=getM(sl.dataset.k),v=m[sl.dataset.side];if(m.a===null||m.b===null||m.a===-1||m.b===-1)return;m.w=m.w===v?null:v;resolve();save();renderTour();});
-$('#tourBox').addEventListener('change',e=>{const{k,sc}=e.target.dataset;if(!k||!sc)return;const m=getM(k);m[sc]=e.target.value.trim();
+$('#tourBox').addEventListener('change',e=>{if(e.target.classList.contains('nmEdit')){const i=+e.target.dataset.idx,v=e.target.value.trim();if(v&&S.tour.names[i]!==undefined){S.tour.names[i]=v;save();}setTimeout(()=>{if(!$('#tourBox').contains(document.activeElement)||!document.activeElement.classList.contains('nmEdit'))renderTour();},0);return;}
+  const{k,sc}=e.target.dataset;if(!k||!sc)return;const m=getM(k);m[sc]=e.target.value.trim();
   if(S.tour.type==='single'&&num(m.sa)&&num(m.sb)&&+m.sa!==+m.sb)m.w=+m.sa>+m.sb?m.a:m.b;resolve();save();renderTour();});
 $('#makeTour').onclick=()=>{makeTour();toast('대진을 다시 뽑았습니다');};
 $('#resetRes').onclick=()=>{const T=S.tour;if(!T)return;T.rounds.flat().concat(T.third?[T.third]:[]).forEach(m=>{m.w=null;m.sa='';m.sb='';});resolve();save();renderTour();};
