@@ -14,7 +14,7 @@ header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;display:
 header h1{font-size:1.05em;margin:0 10px 0 0}
 .sync{font-size:.8em;padding:5px 10px;border-radius:999px;background:#ffffff1a;color:#ffffffc0;white-space:nowrap}
 .sync.on{background:#1f7a4d;color:#fff}.sync.ro{background:#2f6fb5;color:#fff}.sync.warn{background:#b5462f;color:#fff}
-.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
+.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #segSrc,.ro #customWrap,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
 .ro .slot,.ro .mem,.ro .grp,.ro .lg-m input,.ro .slot input,.ro .grp input{pointer-events:none}
 .ro .slot input,.ro .lg-m input{border-color:transparent;background:transparent}
 .wsbar{flex-basis:100%;display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px 0 0;margin-top:2px;border-top:1px solid #ffffff1f}
@@ -206,6 +206,20 @@ th{color:var(--sub);font-size:.85em}
 
 <section class="view" id="v-tour">
   <div class="card">
+    <div class="opt" style="margin-bottom:14px">
+      <div class="lb">참가팀</div>
+      <div class="seg" id="segSrc"><button data-v="groups">👥 조 편성 결과</button><button data-v="custom">✏️ 직접 입력 (반 대항전 등)</button></div>
+    </div>
+    <div id="customWrap" style="display:none;margin-bottom:14px">
+      <div class="row" style="margin-bottom:8px">
+        <span class="hint">빠른 입력:</span>
+        <input type="number" id="clsFrom" value="1" min="1" style="width:56px">반 ~ <input type="number" id="clsTo" value="10" min="1" style="width:56px">반
+        <button class="btn" id="fillCls">반 이름 채우기</button>
+        <span class="hint">또는 아래에 한 줄에 한 팀씩 직접 적으세요</span>
+      </div>
+      <textarea id="custom" style="min-height:120px" placeholder="1반&#10;2반&#10;3반&#10;4반"></textarea>
+      <div class="row" style="margin-top:8px"><button class="pri" id="makeCustom" style="padding:9px 16px;font-size:.95em">🎲 이 팀들로 대진표 만들기</button><span class="hint" id="customInfo"></span></div>
+    </div>
     <div class="row" style="gap:14px">
       <div class="seg" id="segType"><button data-v="single">토너먼트</button><button data-v="league">리그전</button></div>
       <label id="thirdW"><input type="checkbox" id="third" checked> 3·4위전</label>
@@ -254,7 +268,7 @@ const natCmp=(a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true});
 const COLORS=['#2563eb','#0d9488','#d97706','#e11d48','#7c3aed','#059669','#db2777','#4b5563','#ca8a04','#0891b2'];
 
 const def=()=>({id:uid(),title:'',text:'',size:2,keepTeam:true,keepCls:true,rem:'spread',ranges:[],seps:'',balance:false,groups:[],tour:null,
-  tc:{type:'single',third:true,avoid:true,pts:[3,1,0]}});
+  tc:{type:'single',third:true,avoid:true,pts:[3,1,0],src:'groups',custom:''}});
 const KEY3='groupTourMaker_v3';
 let DB=null;try{DB=JSON.parse(localStorage.getItem(KEY3));}catch(e){}
 if(!DB||!Array.isArray(DB.ws)||!DB.ws.length){let old=null;try{old=JSON.parse(localStorage.getItem(KEY));}catch(e){}
@@ -506,18 +520,28 @@ $('#file').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return
 function show(v){DB.view=v;$$('.tab').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$$('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));saveLocal();if(v==='tour'){syncT();renderTour();}}
 $$('.tab').forEach(b=>b.onclick=()=>show(b.dataset.v));
 $('#bigBtn').onclick=()=>document.body.classList.toggle('big');
-$('#toTour').onclick=()=>{if(S.groups.filter(g=>g.id!=='__left'&&g.members.length).length<2)return toast('조가 2개 이상 필요합니다');makeTour();show('tour');};
+$('#toTour').onclick=()=>{if(S.groups.filter(g=>g.id!=='__left'&&g.members.length).length<2)return toast('조가 2개 이상 필요합니다');S.tc.src='groups';makeTour();show('tour');};
 
 /* ===== 대진 ===== */
-function syncT(){const c=S.tc;$$('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.type));
+const customNames=()=>[...new Set((S.tc.custom||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean))];
+function syncT(){const c=S.tc;c.src=c.src||'groups';$$('#segSrc button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.src));
+  $('#customWrap').style.display=c.src==='custom'?'':'none';if(document.activeElement!==$('#custom'))$('#custom').value=c.custom||'';
+  $('#customInfo').textContent=c.src==='custom'?`${customNames().length}팀`:'';
+  $$('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.type));
   $('#third').checked=c.third;$('#avoid').checked=c.avoid;[$('#pW').value,$('#pD').value,$('#pL').value]=c.pts;
-  $('#thirdW').style.display=$('#avoidW').style.display=c.type==='single'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
+  $('#thirdW').style.display=c.type==='single'?'':'none';$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
+$('#segSrc').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.src)return;S.tc.src=b.dataset.v;save();syncT();makeTour();};
+$('#custom').addEventListener('input',e=>{S.tc.custom=e.target.value;save();$('#customInfo').textContent=`${customNames().length}팀`;});
+$('#fillCls').onclick=()=>{let a=+$('#clsFrom').value||1,b=+$('#clsTo').value||a;if(a>b)[a,b]=[b,a];if(b-a>63)return toast('최대 64팀까지');
+  S.tc.custom=Array.from({length:b-a+1},(_,i)=>`${a+i}반`).join('\n');$('#custom').value=S.tc.custom;save();syncT();};
+$('#makeCustom').onclick=()=>{if(customNames().length<2)return toast('팀을 2개 이상 적어 주세요');makeTour();toast('대진표를 만들었습니다');};
 $('#segType').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.type)return;S.tc.type=b.dataset.v;syncT();makeTour();};
 ['third','avoid','pW','pD','pL'].forEach(id=>$('#'+id).addEventListener('change',()=>{const c=S.tc;c.third=$('#third').checked;c.avoid=$('#avoid').checked;c.pts=[+$('#pW').value,+$('#pD').value,+$('#pL').value];save();
   if(id==='third'||id==='avoid')makeTour();else renderTour();}));
 function seedOrder(P){let a=[1];while(a.length<P){const L=a.length*2;a=a.flatMap(x=>[x,L+1-x]);}return a;}
 function makeTour(){
-  const c=S.tc,ents=S.groups.filter(g=>g.id!=='__left'&&g.members.length).map(g=>({name:g.name,sub:g.members.map(label).join('·'),parent:g.parent||''}));
+  const c=S.tc,ents=c.src==='custom'?customNames().map(name=>({name,sub:'',parent:''}))
+    :S.groups.filter(g=>g.id!=='__left'&&g.members.length).map(g=>({name:g.name,sub:g.members.map(label).join('·'),parent:g.parent||''}));
   if(ents.length<2){S.tour=null;save();renderTour();return;}
   const pack=e=>({names:e.map(x=>x.name),subs:e.map(x=>x.sub),parents:e.map(x=>x.parent)});
   if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const slots=seedOrder(P).map(sd=>sd<=ents.length?sd-1:-1);
@@ -547,7 +571,7 @@ function standings(){const T=S.tour,[W,D,L]=S.tc.pts,s=T.names.map((name,i)=>({i
     if(x>y){a.w++;b.l++;a.pts+=W;b.pts+=L;h[m.a+'>'+m.b]=1;}else if(x<y){b.w++;a.l++;b.pts+=W;a.pts+=L;h[m.b+'>'+m.a]=1;}else{a.d++;b.d++;a.pts+=D;b.pts+=D;}});
   return s.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||(h[b.i+'>'+a.i]?1:h[a.i+'>'+b.i]?-1:0));}
 function renderTour(){const T=S.tour,box=$('#tourBox');
-  if(!T){box.innerHTML='<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.</div>';$('#tourHint').textContent='';return;}
+  if(!T){box.innerHTML=S.tc.src==='custom'?'<div class="empty">위에 참가팀(예: 1반, 2반…)을 적고 <b>🎲 이 팀들로 대진표 만들기</b>를 누르세요.</div>':'<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.<br>반 대항전처럼 팀을 직접 넣으려면 위에서 <b>✏️ 직접 입력</b>을 고르세요.</div>';$('#tourHint').textContent='';return;}
   if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>m.a===-1||m.b===-1).length;
     $('#tourHint').textContent=`${T.names.length}팀 · ${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''} ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
     box.innerHTML=(f.w>=0&&f.w!==null?`<div class="champ">🏆 ${esc(nm(f.w))} &nbsp;·&nbsp; 🥈 ${esc(nm(f.w===f.a?f.b:f.a))}${T.third&&T.third.w>=0&&T.third.w!==null?` &nbsp;·&nbsp; 🥉 ${esc(nm(T.third.w))}`:''}</div>`:'')
