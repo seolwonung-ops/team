@@ -146,7 +146,7 @@ th{color:var(--sub);font-size:.85em}
     <div class="card">
       <div class="step">STEP 1</div>
       <h2>학생 입력</h2>
-      <textarea id="txt" placeholder="한 줄에 한 명씩 적으세요.&#10;&#10;1번 강서연&#10;2번 고서현&#10;...&#10;&#10;팀이 이미 있으면 팀 이름 줄 아래에 적습니다.&#10;1팀&#10;2번 고서현&#10;10번 김효린&#10;2팀&#10;16번 이유정"></textarea>
+      <textarea id="txt" placeholder="한 줄에 한 명씩 적으세요.&#10;&#10;1번 강서연&#10;2번 고서현&#10;...&#10;&#10;반이 여러 개면 반 이름 줄 아래에 적거나&#10;3-5 김민준 / 20305 김민준 처럼 적어도 됩니다.&#10;3반&#10;1번 강서연&#10;4반&#10;1번 고서현&#10;&#10;팀이 이미 있으면 팀 이름 줄 아래에 적습니다.&#10;1팀&#10;2번 고서현"></textarea>
       <div class="row" style="margin-top:8px">
         <label class="btn">📂 엑셀·CSV 불러오기<input type="file" id="file" accept=".xlsx,.xls,.csv,.txt,image/*" hidden></label>
         <button class="btn" id="clearTxt">지우기</button>
@@ -160,6 +160,10 @@ th{color:var(--sub);font-size:.85em}
       <h2>조 짜기</h2>
       <div class="stepper">한 조에
         <button id="minus">−</button><span class="v" id="sizeV">2</span><button id="plus">+</button>명씩
+      </div>
+      <div class="opt" id="clsOpt">
+        <div class="lb">여러 반</div>
+        <div class="seg" id="segCls"><button data-v="1">반 안에서만 섞기</button><button data-v="0">반 섞어서 짜기</button></div>
       </div>
       <div class="opt" id="teamOpt">
         <div class="lb">이미 나뉜 팀</div>
@@ -249,7 +253,7 @@ const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearT
 const natCmp=(a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true});
 const COLORS=['#2563eb','#0d9488','#d97706','#e11d48','#7c3aed','#059669','#db2777','#4b5563','#ca8a04','#0891b2'];
 
-const def=()=>({id:uid(),title:'',text:'',size:2,keepTeam:true,rem:'spread',ranges:[],seps:'',balance:false,groups:[],tour:null,
+const def=()=>({id:uid(),title:'',text:'',size:2,keepTeam:true,keepCls:true,rem:'spread',ranges:[],seps:'',balance:false,groups:[],tour:null,
   tc:{type:'single',third:true,avoid:true,pts:[3,1,0]}});
 const KEY3='groupTourMaker_v3';
 let DB=null;try{DB=JSON.parse(localStorage.getItem(KEY3));}catch(e){}
@@ -350,32 +354,39 @@ const TEAM_RE=/^([0-9A-Za-z]{1,3})(팀|조|모둠)$/;
 function parseLine(line){
   const raw=line.trim();if(!raw)return null;
   const mh=raw.match(/^\[(.+)\]$/);if(mh)return{header:mh[1].trim()};
-  const parts=raw.replace(/팀장\s*[:：]?/g,' ').split(/[\s,\t:：·|()]+/).map(p=>p.replace(/[^0-9A-Za-z가-힣]/g,'')).filter(Boolean);
-  let no=null,g='',team='',name=[];
+  const parts=raw.replace(/팀장\s*[:：]?/g,' ').split(/[\s,\t:：·|()]+/).map(p=>p.replace(/[^0-9A-Za-z가-힣-]/g,'').replace(/^-+|-+$/g,'')).filter(Boolean);
+  let no=null,g='',team='',cls=null,name=[];
   for(const p of parts){
-    if(no===null&&/^\d+번?$/.test(p))no=parseInt(p,10);
+    if(/^\d학년$/.test(p))continue;
+    else if(/^\d{1,2}반$/.test(p))cls=parseInt(p,10);
+    else if(no===null&&/^\d{1,2}-\d{1,2}$/.test(p)){const[a,b]=p.split('-').map(Number);cls=a;no=b;}
+    else if(no===null&&/^[1-3]\d{4}$/.test(p)){cls=parseInt(p.slice(1,3),10);no=parseInt(p.slice(3),10);}
+    else if(no===null&&/^\d+번?$/.test(p))no=parseInt(p,10);
     else if(/^(남|여|남자|여자)$/.test(p))g=p[0];
     else if(TEAM_RE.test(p))team=p;
     else if(/^\d+명$/.test(p))continue;
     else name.push(p);
   }
   const nm=name.join(' ');
-  if(no===null&&!/[가-힣]{2,}|[A-Za-z]{2,}/.test(nm))return team?{header:team}:null;
-  return{no,name:nm,g,team};
+  if(no===null&&!/[가-힣]{2,}|[A-Za-z]{2,}/.test(nm))return(team||cls!==null)?{header:team,clsHeader:cls}:null;
+  return{no,name:nm,g,team,cls};
 }
 function parseText(text){
-  const out=[],seen=new Set();let next=1,cur='';
-  (text||'').split(/\r?\n/).forEach(line=>{const r=parseLine(line);if(!r)return;if(r.header){cur=r.header;return;}
-    const key=r.no!==null?'n'+r.no:'m'+r.name;if(seen.has(key))return;seen.add(key);
-    const no=r.no!==null?r.no:next;next=Math.max(next,no+1);
-    out.push({no,name:r.name,g:r.g,team:r.team||cur});});
+  const out=[],seen=new Set(),nextBy={};let cur='',curCls='';
+  (text||'').split(/\r?\n/).forEach(line=>{const r=parseLine(line);if(!r)return;
+    if(r.header!==undefined){if(r.clsHeader!==null&&r.clsHeader!==undefined){curCls=r.clsHeader;cur='';}if(r.header)cur=r.header;return;}
+    const cls=r.cls!==null&&r.cls!==undefined?r.cls:curCls;
+    const key=r.no!==null?'n'+cls+'-'+r.no:'m'+cls+'-'+r.name;if(seen.has(key))return;seen.add(key);
+    const nx=nextBy[cls]||1,no=r.no!==null?r.no:nx;nextBy[cls]=Math.max(nx,no+1);
+    out.push({no,name:r.name,g:r.g,team:r.team||cur,cls});});
   return out;
 }
 function rowsToText(rows){
   rows=rows.map(r=>(r||[]).map(c=>String(c??'').trim())).filter(r=>r.some(Boolean));if(!rows.length)return'';
   for(let h=0;h<Math.min(5,rows.length);h++){const hr=rows[h],idx=k=>hr.findIndex(c=>k.test(c));const ni=idx(/이름|성명/);if(ni<0)continue;
-    const noi=idx(/번호|학번|^번$/),gi=idx(/성별/),ti=idx(/팀|조|모둠/);let cur=null;const L=[];
-    rows.slice(h+1).forEach(r=>{if(!r[ni])return;if(ti>=0&&r[ti]!==cur){cur=r[ti];L.push('['+(cur||'팀 없음')+']');}L.push([noi>=0?r[noi]:'',r[ni],gi>=0?r[gi]:''].filter(Boolean).join(' '));});
+    const noi=idx(/번호|학번|^번$/),gi=idx(/성별/),ti=idx(/팀|^조$|모둠/),ci=idx(/^반$|학반|^반\s/);let cur=null;const L=[];
+    rows.slice(h+1).forEach(r=>{if(!r[ni])return;if(ti>=0&&r[ti]!==cur){cur=r[ti];L.push('['+(cur||'팀 없음')+']');}
+      const c=ci>=0&&r[ci]?String(r[ci]).replace(/[^0-9]/g,''):'';L.push([c?c+'반':'',noi>=0?r[noi]:'',r[ni],gi>=0?r[gi]:''].filter(Boolean).join(' '));});
     return L.join('\n');}
   const stuRe=/^\d+번?\s*[가-힣A-Za-z]{2,}/,first=rows[0].filter(Boolean);
   if(rows.length>1&&first.length>=2&&first.every(c=>c.length<=12&&!stuRe.test(c))&&rows.slice(1).some(r=>r.some(c=>stuRe.test(c)))){
@@ -383,6 +394,10 @@ function rowsToText(rows){
   return rows.map(r=>r.filter(Boolean).join(' ')).join('\n');
 }
 const students=()=>parseText(S.text);
+const skey=s=>s.cls+'-'+s.no;
+const cmpS=(a,b)=>(+a.cls||0)-(+b.cls||0)||a.no-b.no;
+const noTxt=s=>s.cls!==''&&s.cls!==undefined?`${s.cls}-${s.no}`:`${s.no}`;
+const clsOf=list=>[...new Set(list.map(s=>s.cls).filter(c=>c!==''&&c!==undefined))].sort((a,b)=>a-b);
 const teamsOf=list=>[...new Set(list.map(s=>s.team).filter(Boolean))].sort(natCmp);
 
 /* ===== 조 계산 ===== */
@@ -390,26 +405,28 @@ function sizesFor(n,v,rem){v=Math.max(1,v|0);if(n<=0)return[];
   if(rem==='sep'){const a=[];for(let x=n;x>0;x-=v)a.push(Math.min(v,x));return a;}
   const g=Math.max(1,Math.floor(n/v)),b=Math.floor(n/g),e=n%g;return Array.from({length:g},(_,i)=>b+(i<e?1:0));}
 function plan(){ // [{team, mem, size}] 묶음 목록
-  const all=students(),useTeam=S.keepTeam&&teamsOf(all).length>0,out=[],used=new Set();
+  const all=students(),useTeam=S.keepTeam&&teamsOf(all).length>0,useCls=S.keepCls&&clsOf(all).length>0,out=[],used=new Set();
   const segs=S.ranges.length?S.ranges.map(r=>{const lo=Math.min(r.from,r.to),hi=Math.max(r.from,r.to);
-      const m=all.filter(s=>s.no>=lo&&s.no<=hi&&!used.has(s.no));m.forEach(s=>used.add(s.no));return{mem:m,size:r.size||S.size};})
+      const m=all.filter(s=>s.no>=lo&&s.no<=hi&&!used.has(skey(s)));m.forEach(s=>used.add(skey(s)));return{mem:m,size:r.size||S.size};})
     :[{mem:all,size:S.size}];
-  segs.forEach(sg=>{if(!useTeam){out.push({team:'',mem:sg.mem,size:sg.size});return;}
-    const m=new Map();sg.mem.forEach(s=>{const t=s.team||'';if(!m.has(t))m.set(t,[]);m.get(t).push(s);});
-    [...m.keys()].sort((a,b)=>(!a)-(!b)||natCmp(a,b)).forEach(t=>out.push({team:t,mem:m.get(t),size:sg.size}));});
-  const left=S.ranges.length?all.filter(s=>!used.has(s.no)):[];
+  segs.forEach(sg=>{
+    const m=new Map();sg.mem.forEach(s=>{const c=useCls?(s.cls===''?'':s.cls):'',t=useTeam?(s.team||''):'',k=c+'|'+t;if(!m.has(k))m.set(k,{cls:c,team:t,mem:[]});m.get(k).mem.push(s);});
+    [...m.values()].sort((a,b)=>((a.cls===''?999:a.cls)-(b.cls===''?999:b.cls))||(!a.team)-(!b.team)||natCmp(a.team,b.team))
+      .forEach(x=>{const cl=x.cls!==''?x.cls+'반':'';out.push({team:x.team,cls:cl,label:[cl,x.team].filter(Boolean).join(' '),mem:x.mem,size:sg.size});});});
+  const left=S.ranges.length?all.filter(s=>!used.has(skey(s))):[];
   return{parts:out.filter(p=>p.mem.length),left,useTeam,all};
 }
 function renderPreview(){
-  const all=students(),tm=teamsOf(all);
-  $('#sum').innerHTML=all.length?`<b>${all.length}명</b> 인식${tm.length?` · <b>${tm.length}개 팀</b> (${tm.map(t=>`${esc(t)} ${all.filter(s=>s.team===t).length}명`).join(', ')})`:''}`:'학생을 입력하거나 파일을 불러오세요.';
-  $('#teamOpt').style.display=tm.length?'':'none';
+  const all=students(),tm=teamsOf(all),cl=clsOf(all);
+  $('#sum').innerHTML=all.length?`<b>${all.length}명</b> 인식${cl.length?` · <b>${cl.length}개 반</b> (${cl.map(c=>`${c}반 ${all.filter(s=>s.cls===c).length}명`).join(', ')})`:''}${tm.length?` · <b>${tm.length}개 팀</b>`+(cl.length>1?'':` (${tm.map(t=>`${esc(t)} ${all.filter(s=>s.team===t).length}명`).join(', ')})`):''}`:'학생을 입력하거나 파일을 불러오세요.';
+  $('#teamOpt').style.display=tm.length?'':'none';$('#clsOpt').style.display=cl.length>1?'':'none';
+  $$('#segCls button').forEach(b=>b.classList.toggle('on',(b.dataset.v==='1')===S.keepCls));
   $('#sizeV').textContent=S.size;
   $$('#segTeam button').forEach(b=>b.classList.toggle('on',(b.dataset.v==='1')===S.keepTeam));
   $$('#segRem button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.rem));
   const P=plan();
   if(!P.all.length){$('#pv').textContent='→ 학생을 입력하면 몇 개 조가 나오는지 미리 보여 드립니다.';return;}
-  const lines=P.parts.map(p=>{const sz=sizesFor(p.mem.length,p.size,S.rem);return`${p.team?`<b>${esc(p.team)}</b> ${p.mem.length}명 → `:`${p.mem.length}명 → `}${sz.length}개 조 (${sz.join('·')})`;});
+  const lines=P.parts.map(p=>{const sz=sizesFor(p.mem.length,p.size,S.rem);return`${p.label?`<b>${esc(p.label)}</b> ${p.mem.length}명 → `:`${p.mem.length}명 → `}${sz.length}개 조 (${sz.join('·')})`;});
   const total=P.parts.reduce((a,p)=>a+sizesFor(p.mem.length,p.size,S.rem).length,0);
   $('#pv').innerHTML=`→ 모두 <b>${total}개 조</b><br>`+lines.join('<br>')+(P.left.length?`<div class="warn">범위 밖 ${P.left.length}명은 '미배정'으로 남습니다</div>`:'');
 }
@@ -427,7 +444,7 @@ function makeGroups(){
   const seps=parseSeps(),groups=[];let n=1,warn=0;
   P.parts.forEach(p=>{const sz=sizesFor(p.mem.length,p.size,S.rem);let best=null,bv=1e9;
     for(let t=0;t<500&&bv>0;t++){const gs=deal(p.mem,sz),v=viol(gs,seps);if(v<bv){bv=v;best=gs;}}warn+=bv;
-    best.sort((a,b)=>a.length-b.length).forEach((g,k)=>groups.push({id:uid(),name:p.team?`${p.team}-${k+1}`:`${n++}조`,parent:p.team,members:g.sort((a,b)=>a.no-b.no)}));});
+    best.sort((a,b)=>a.length-b.length).forEach((g,k)=>groups.push({id:uid(),name:p.team?`${p.label}-${k+1}`:p.cls?`${p.cls} ${k+1}조`:`${n++}조`,parent:p.label,members:g.sort(cmpS)}));});
   if(P.left.length)groups.push({id:'__left',name:'미배정',parent:'',members:P.left});
   S.groups=groups;sel=null;save();renderGroups();
   toast(warn?`같은 조 금지 ${warn}건은 지키지 못했습니다`:`${groups.filter(g=>g.id!=='__left').length}개 조 완성`);
@@ -435,16 +452,16 @@ function makeGroups(){
 /* ===== 결과 보드 ===== */
 let sel=null,drag=null;
 const colorOf=g=>{const ps=[...new Set(S.groups.map(x=>x.parent).filter(Boolean))].sort(natCmp);const i=g.parent?ps.indexOf(g.parent):S.groups.indexOf(g);return g.id==='__left'?'#9aa39e':COLORS[i%COLORS.length];};
-const label=s=>s.name||`${s.no}번`;
+const label=s=>s.name||`${noTxt(s)}번`;
 function renderGroups(){
   const box=$('#groups'),gs=S.groups;
   if(!gs.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">STEP 2에서 <b>🎲 조 짜기</b>를 누르면 여기에 나타납니다.</div>';$('#resInfo').textContent='';return;}
   const real=gs.filter(g=>g.id!=='__left');
   $('#resInfo').textContent=`${real.length}개 조 · ${real.reduce((a,g)=>a+g.members.length,0)}명`;
   box.innerHTML=gs.map((g,gi)=>`<div class="grp" data-g="${gi}" style="--c:${colorOf(g)}"><div class="hd"><input value="${esc(g.name)}" data-name="${gi}"><span class="cnt">${g.members.length}명</span></div>
-    ${g.members.map((s,mi)=>`<span class="mem${sel&&sel.g===gi&&sel.m===mi?' sel':''}" draggable="true" data-g="${gi}" data-m="${mi}"><span class="no">${s.no}</span>${esc(s.name||s.no+'번')}</span>`).join('')}</div>`).join('');
+    ${g.members.map((s,mi)=>`<span class="mem${sel&&sel.g===gi&&sel.m===mi?' sel':''}" draggable="true" data-g="${gi}" data-m="${mi}"><span class="no">${noTxt(s)}</span>${esc(s.name||noTxt(s)+'번')}</span>`).join('')}</div>`).join('');
 }
-const sortM=g=>g.members.sort((a,b)=>a.no-b.no);
+const sortM=g=>g.members.sort(cmpS);
 function swap(a,b){const A=S.groups[a.g].members,B=S.groups[b.g].members;[A[a.m],B[b.m]]=[B[b.m],A[a.m]];sortM(S.groups[a.g]);sortM(S.groups[b.g]);}
 function move(a,g){if(a.g===g)return;const[s]=S.groups[a.g].members.splice(a.m,1);S.groups[g].members.push(s);sortM(S.groups[g]);}
 $('#groups').addEventListener('click',e=>{if(e.target.matches('input'))return;const m=e.target.closest('.mem');
@@ -457,9 +474,9 @@ $('#groups').addEventListener('drop',e=>{e.preventDefault();if(!drag)return;cons
   if(m&&!(+m.dataset.g===drag.g&&+m.dataset.m===drag.m))swap(drag,{g:+m.dataset.g,m:+m.dataset.m});else if(g)move(drag,+g.dataset.g);drag=null;sel=null;save();renderGroups();});
 $('#groups').addEventListener('dragend',()=>{drag=null;$$('.grp.target').forEach(x=>x.classList.remove('target'));});
 async function copy(t,msg){try{await navigator.clipboard.writeText(t);toast(msg||'복사했습니다');}catch(e){$('#dataText').value=t;$('#dataModal').classList.add('on');}}
-$('#copyRes').onclick=()=>{if(!S.groups.length)return toast('결과가 없습니다');copy(S.groups.map(g=>`${g.name} (${g.members.length}명): ${g.members.map(s=>`${s.no} ${s.name}`.trim()).join(', ')}`).join('\n'));};
+$('#copyRes').onclick=()=>{if(!S.groups.length)return toast('결과가 없습니다');copy(S.groups.map(g=>`${g.name} (${g.members.length}명): ${g.members.map(s=>`${noTxt(s)} ${s.name}`.trim()).join(', ')}`).join('\n'));};
 $('#copyTsv').onclick=()=>{if(!S.groups.length)return toast('결과가 없습니다');const mx=Math.max(...S.groups.map(g=>g.members.length)),R=[S.groups.map(g=>g.name).join('\t')];
-  for(let i=0;i<mx;i++)R.push(S.groups.map(g=>g.members[i]?`${g.members[i].no} ${g.members[i].name}`.trim():'').join('\t'));copy(R.join('\n'),'엑셀에 붙여넣으세요');};
+  for(let i=0;i<mx;i++)R.push(S.groups.map(g=>g.members[i]?`${noTxt(g.members[i])} ${g.members[i].name}`.trim():'').join('\t'));copy(R.join('\n'),'엑셀에 붙여넣으세요');};
 
 /* ===== 입력 이벤트 ===== */
 $('#txt').addEventListener('input',e=>{S.text=e.target.value;save();renderPreview();});
@@ -467,6 +484,7 @@ $('#clearTxt').onclick=()=>{if(!S.text)return;S.text='';$('#txt').value='';save(
 $('#minus').onclick=()=>{S.size=Math.max(1,S.size-1);save();renderPreview();};
 $('#plus').onclick=()=>{S.size=Math.min(50,S.size+1);save();renderPreview();};
 $('#segTeam').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.keepTeam=b.dataset.v==='1';save();renderPreview();};
+$('#segCls').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.keepCls=b.dataset.v==='1';save();renderPreview();};
 $('#segRem').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.rem=b.dataset.v;save();renderPreview();};
 $('#go').onclick=makeGroups;
 $('#addRange').onclick=()=>{const all=students(),last=S.ranges[S.ranges.length-1],mx=all.reduce((m,s)=>Math.max(m,s.no),0)||30;
