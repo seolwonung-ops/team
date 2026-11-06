@@ -14,7 +14,7 @@ header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;display:
 header h1{font-size:1.05em;margin:0 10px 0 0}
 .sync{font-size:.8em;padding:5px 10px;border-radius:999px;background:#ffffff1a;color:#ffffffc0;white-space:nowrap}
 .sync.on{background:#1f7a4d;color:#fff}.sync.ro{background:#2f6fb5;color:#fff}.sync.warn{background:#b5462f;color:#fff}
-.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #segSrc,.ro #customWrap,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
+.ro #v-groups .top,.ro .wsadd,.ro .wb,.ro #makeTour,.ro #resetRes,.ro #toTour,.ro #segType,.ro #sizeW,.ro #segSrc,.ro #customWrap,.ro #thirdW,.ro #avoidW,.ro #ptsW,.ro #dataBtn{display:none!important}
 .ro .slot,.ro .mem,.ro .grp,.ro .lg-m input,.ro .slot input,.ro .grp input{pointer-events:none}
 .ro .slot input,.ro .lg-m input{border-color:transparent;background:transparent}
 .wsbar{flex-basis:100%;display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px 0 0;margin-top:2px;border-top:1px solid #ffffff1f}
@@ -100,6 +100,8 @@ body.big .groups{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .cell.done .out,.cell.done .vu,.cell.done .vd{border-color:var(--acc);border-width:0;border-style:solid}
 .cell.done .out{border-top-width:3px}.cell.done .vu,.cell.done .vd{border-right-width:3px}
 .cell.fed .inl{border-color:var(--acc);border-top-width:3px}
+.cell.hid{visibility:hidden}
+.round.pre h3{color:#b5462f}
 .round.third{margin-left:10px;padding-left:16px;border-left:2px dashed var(--line)}
 .round.final .match{border:2px solid #e8c547;box-shadow:0 2px 10px #e8c54740}
 .slot{display:flex;align-items:center;gap:6px;padding:8px 9px;border-bottom:1px solid var(--line);cursor:pointer;border-left:4px solid var(--c,transparent)}
@@ -222,6 +224,7 @@ th{color:var(--sub);font-size:.85em}
     </div>
     <div class="row" style="gap:14px">
       <div class="seg" id="segType"><button data-v="single">토너먼트</button><button data-v="league">리그전</button></div>
+      <label id="sizeW" class="hint">시작 <select id="bsize"><option value="auto">자동</option><option value="64">64강</option><option value="32">32강</option><option value="16">16강</option><option value="8">8강</option><option value="4">4강</option></select></label>
       <label id="thirdW"><input type="checkbox" id="third" checked> 3·4위전</label>
       <label id="avoidW"><input type="checkbox" id="avoid" checked> 1라운드 같은 팀끼리 피하기</label>
       <span id="ptsW" class="hint">승점 승<input type="number" id="pW" value="3" style="width:52px"> 무<input type="number" id="pD" value="1" style="width:52px"> 패<input type="number" id="pL" value="0" style="width:52px"></span>
@@ -268,7 +271,7 @@ const natCmp=(a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true});
 const COLORS=['#2563eb','#0d9488','#d97706','#e11d48','#7c3aed','#059669','#db2777','#4b5563','#ca8a04','#0891b2'];
 
 const def=()=>({id:uid(),title:'',text:'',size:2,keepTeam:true,keepCls:true,rem:'spread',ranges:[],seps:'',balance:false,groups:[],tour:null,
-  tc:{type:'single',third:true,avoid:true,pts:[3,1,0],src:'groups',custom:''}});
+  tc:{type:'single',third:true,avoid:true,pts:[3,1,0],src:'groups',custom:'',size:'auto'}});
 const KEY3='groupTourMaker_v3';
 let DB=null;try{DB=JSON.parse(localStorage.getItem(KEY3));}catch(e){}
 if(!DB||!Array.isArray(DB.ws)||!DB.ws.length){let old=null;try{old=JSON.parse(localStorage.getItem(KEY));}catch(e){}
@@ -529,12 +532,13 @@ function syncT(){const c=S.tc;c.src=c.src||'groups';$$('#segSrc button').forEach
   $('#customInfo').textContent=c.src==='custom'?`${customNames().length}팀`:'';
   $$('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.type));
   $('#third').checked=c.third;$('#avoid').checked=c.avoid;[$('#pW').value,$('#pD').value,$('#pL').value]=c.pts;
-  $('#thirdW').style.display=c.type==='single'?'':'none';$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
+  $('#thirdW').style.display=$('#sizeW').style.display=c.type==='single'?'':'none';$('#bsize').value=String(c.size||'auto');$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
 $('#segSrc').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.src)return;S.tc.src=b.dataset.v;save();syncT();makeTour();};
 $('#custom').addEventListener('input',e=>{S.tc.custom=e.target.value;save();$('#customInfo').textContent=`${customNames().length}팀`;});
 $('#fillCls').onclick=()=>{let a=+$('#clsFrom').value||1,b=+$('#clsTo').value||a;if(a>b)[a,b]=[b,a];if(b-a>63)return toast('최대 64팀까지');
   S.tc.custom=Array.from({length:b-a+1},(_,i)=>`${a+i}반`).join('\n');$('#custom').value=S.tc.custom;save();syncT();};
 $('#makeCustom').onclick=()=>{if(customNames().length<2)return toast('팀을 2개 이상 적어 주세요');makeTour();toast('대진표를 만들었습니다');};
+$('#bsize').onchange=e=>{S.tc.size=e.target.value==='auto'?'auto':+e.target.value;save();makeTour();toast('시작 라운드를 바꿔 대진을 새로 짰습니다');};
 $('#segType').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.type)return;S.tc.type=b.dataset.v;syncT();makeTour();};
 ['third','avoid','pW','pD','pL'].forEach(id=>$('#'+id).addEventListener('change',()=>{const c=S.tc;c.third=$('#third').checked;c.avoid=$('#avoid').checked;c.pts=[+$('#pW').value,+$('#pD').value,+$('#pL').value];save();
   if(id==='third'||id==='avoid')makeTour();else renderTour();}));
@@ -544,12 +548,12 @@ function makeTour(){
     :S.groups.filter(g=>g.id!=='__left'&&g.members.length).map(g=>({name:g.name,sub:g.members.map(label).join('·'),parent:g.parent||''}));
   if(ents.length<2){S.tour=null;save();renderTour();return;}
   const pack=e=>({names:e.map(x=>x.name),subs:e.map(x=>x.sub),parents:e.map(x=>x.parent)});
-  if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const slots=seedOrder(P).map(sd=>sd<=ents.length?sd-1:-1);
+  if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const want=c.size==='auto'||!c.size?P:+c.size;if(want>P)P=want;const main=Math.min(want,P);const slots=seedOrder(P).map(sd=>sd<=ents.length?sd-1:-1);
     const clash=e=>{let k=0;for(let i=0;i<P/2;i++){const a=slots[2*i],b=slots[2*i+1];if(a>=0&&b>=0&&e[a].parent&&e[a].parent===e[b].parent)k++;}return k;};
     let best=null,bk=1e9;for(let t=0;t<(c.avoid?600:1)&&bk>0;t++){const e=shuffle(ents.slice()),k=c.avoid?clash(e):0;if(k<bk){bk=k;best=e;}}
     const rounds=[Array.from({length:P/2},(_,i)=>({a:slots[2*i],b:slots[2*i+1],w:null,sa:'',sb:''}))];
     for(let n=P/4;n>=1;n/=2)rounds.push(Array.from({length:n},()=>({a:null,b:null,w:null,sa:'',sb:''})));
-    S.tour=Object.assign({type:'single',rounds,third:c.third&&rounds.length>=2?{a:null,b:null,w:null,sa:'',sb:''}:null},pack(best));
+    S.tour=Object.assign({type:'single',main,rounds,third:c.third&&rounds.length>=2?{a:null,b:null,w:null,sa:'',sb:''}:null},pack(best));
   }else{const e=shuffle(ents.slice()),list=e.map((_,i)=>i);if(list.length%2)list.push(-1);const m=list.length,rounds=[];
     for(let r=0;r<m-1;r++){const ms=[];for(let i=0;i<m/2;i++){const a=list[i],b=list[m-1-i];if(a!==-1&&b!==-1)ms.push(r%2?{a:b,b:a,sa:'',sb:''}:{a,b,sa:'',sb:''});}rounds.push(ms);list.splice(1,0,list.pop());}
     S.tour=Object.assign({type:'league',rounds},pack(e));}
@@ -560,6 +564,8 @@ function resolve(){const T=S.tour;if(!T||T.type!=='single')return;const R=T.roun
   R.forEach((rd,r)=>rd.forEach((m,i)=>{if(r>0){m.a=R[r-1][2*i].w;m.b=R[r-1][2*i+1].w;}fix(m);}));
   if(T.third){const sf=R[R.length-2],lo=m=>(m.w===null||m.a===null||m.b===null)?null:(m.w===m.a?m.b:m.a);T.third.a=lo(sf[0]);T.third.b=lo(sf[1]);fix(T.third);}}
 const rName=t=>t===2?'결승':t===4?'준결승':t+'강';
+const prelimN=T=>{const P=T.rounds[0].length*2,m=T.main||P;return Math.round(Math.log2(P/m));};
+const rLabel=(T,r)=>{const P=T.rounds[0].length*2,k=prelimN(T);return r<k?(k===1?'예선':`예선 ${r+1}차`):rName(P/2**r);};
 const nm=i=>i===-1?'부전승':i===null||i===undefined?'대기':S.tour.names[i];
 const pc=i=>{if(!(i>=0))return'transparent';const g=S.groups.find(g=>g.name===S.tour.names[i]);return g?colorOf(g):'transparent';};
 function slot(m,side,key){const v=m[side],cls=v===-1?'bye':v===null?'tbd':m.w===null?'':m.w===v?'win':'lose',play=m.a!==null&&m.b!==null&&m.a!==-1&&m.b!==-1,sub=v>=0?S.tour.subs[v]:'';
@@ -572,14 +578,15 @@ function standings(){const T=S.tour,[W,D,L]=S.tc.pts,s=T.names.map((name,i)=>({i
   return s.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||(h[b.i+'>'+a.i]?1:h[a.i+'>'+b.i]?-1:0));}
 function renderTour(){const T=S.tour,box=$('#tourBox');
   if(!T){box.innerHTML=S.tc.src==='custom'?'<div class="empty">위에 참가팀(예: 1반, 2반…)을 적고 <b>🎲 이 팀들로 대진표 만들기</b>를 누르세요.</div>':'<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.<br>반 대항전처럼 팀을 직접 넣으려면 위에서 <b>✏️ 직접 입력</b>을 고르세요.</div>';$('#tourHint').textContent='';return;}
-  if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>m.a===-1||m.b===-1).length;
-    $('#tourHint').textContent=`${T.names.length}팀 · ${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''} ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
+  if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>(m.a===-1)!==(m.b===-1)).length;
+    const k=prelimN(T),pre=R.slice(0,k).flat().filter(m=>m.a!==-1&&m.b!==-1).length;
+    $('#tourHint').textContent=`${T.names.length}팀 · `+(k?`예선 ${pre}경기 → ${rName(T.main)}`:`${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''}`)+` ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
     box.innerHTML=(f.w>=0&&f.w!==null?`<div class="champ">🏆 ${esc(nm(f.w))} &nbsp;·&nbsp; 🥈 ${esc(nm(f.w===f.a?f.b:f.a))}${T.third&&T.third.w>=0&&T.third.w!==null?` &nbsp;·&nbsp; 🥉 ${esc(nm(T.third.w))}`:''}</div>`:'')
       +'<div class="bracket">'+R.map((rd,r)=>{const last=r===R.length-1;
-        return `<div class="round${last?' final':''}"><h3>${rName(P/2**r)}</h3><div class="ms">${rd.map((m,i)=>{
+        return `<div class="round${last?' final':''}${r<k?' pre':''}"><h3>${rLabel(T,r)}</h3><div class="ms">${rd.map((m,i)=>{
           const bye=m.a===-1||m.b===-1,done=m.w!==null&&m.w!==-1,fed=r>0&&(m.a!==null||m.b!==null);
           const lines=(r>0?'<i class="ln inl"></i>':'')+(last?'':`<i class="ln out"></i><i class="ln ${i%2?'vd':'vu'}"></i>`);
-          return `<div class="cell${bye?' bye':''}${done?' done':''}${fed?' fed':''}">${lines}<div class="match">${slot(m,'a',r+'-'+i)}${slot(m,'b',r+'-'+i)}</div></div>`;}).join('')}</div></div>`;}).join('')
+          return `<div class="cell${bye?' bye':''}${(bye&&r<k)||(m.a===-1&&m.b===-1)?' hid':''}${done?' done':''}${fed?' fed':''}">${lines}<div class="match">${slot(m,'a',r+'-'+i)}${slot(m,'b',r+'-'+i)}</div></div>`;}).join('')}</div></div>`;}).join('')
       +(T.third?`<div class="round third"><h3>3·4위전</h3><div class="ms"><div class="cell"><div class="match">${slot(T.third,'a','third')}${slot(T.third,'b','third')}</div></div></div></div>`:'')+'</div>';
   }else{const st=standings();$('#tourHint').textContent=`${T.names.length}팀 리그전 · ${T.rounds.reduce((a,r)=>a+r.length,0)}경기 — 점수를 입력하면 순위가 바로 바뀝니다`;
     box.innerHTML=`<div class="two"><div><h2>순위</h2><table><tr><th>#</th><th>팀</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr>${st.map((s,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(s.name)}</b><div class="hint">${esc(T.subs[s.i]||'')}</div></td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td><td>${s.gf-s.ga>0?'+':''}${s.gf-s.ga}</td><td><b>${s.pts}</b></td></tr>`).join('')}</table></div>
@@ -591,7 +598,7 @@ $('#tourBox').addEventListener('change',e=>{const{k,sc}=e.target.dataset;if(!k||
 $('#makeTour').onclick=()=>{makeTour();toast('대진을 다시 뽑았습니다');};
 $('#resetRes').onclick=()=>{const T=S.tour;if(!T)return;T.rounds.flat().concat(T.third?[T.third]:[]).forEach(m=>{m.w=null;m.sa='';m.sb='';});resolve();save();renderTour();};
 $('#copyTour').onclick=()=>{const T=S.tour;if(!T)return;const L=i=>nm(i)+(i>=0&&T.subs[i]?`(${T.subs[i]})`:'');let t='';
-  if(T.type==='single'){const P=T.rounds[0].length*2;T.rounds.forEach((rd,r)=>{t+=`[${rName(P/2**r)}]\n`;rd.forEach(m=>{if(m.a===-1||m.b===-1)return;t+=`${L(m.a)} ${m.sa} vs ${m.sb} ${L(m.b)}${m.w!==null?` → ${nm(m.w)} 승`:''}\n`;});});
+  if(T.type==='single'){const P=T.rounds[0].length*2;T.rounds.forEach((rd,r)=>{t+=`[${rLabel(T,r)}]\n`;rd.forEach(m=>{if(m.a===-1||m.b===-1)return;t+=`${L(m.a)} ${m.sa} vs ${m.sb} ${L(m.b)}${m.w!==null?` → ${nm(m.w)} 승`:''}\n`;});});
     if(T.third)t+=`[3·4위전]\n${L(T.third.a)} vs ${L(T.third.b)}${T.third.w!==null?` → ${nm(T.third.w)} 승`:''}\n`;}
   else t='순위\t팀\t승\t무\t패\t득실\t승점\n'+standings().map((s,i)=>`${i+1}\t${s.name}\t${s.w}\t${s.d}\t${s.l}\t${s.gf-s.ga}\t${s.pts}`).join('\n');copy(t);};
 
