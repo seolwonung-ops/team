@@ -101,6 +101,34 @@ body.big .groups{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .cell.done .out{border-top-width:3px}.cell.done .vu,.cell.done .vd{border-right-width:3px}
 .cell.fed .inl{border-color:var(--acc);border-top-width:3px}
 .cell.hid{visibility:hidden}
+/* 세로형(학교식) 대진표 */
+.tw{overflow-x:auto;padding:4px 0 10px}
+.tree{position:relative;margin:0 auto;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+.tree svg{position:absolute;left:0;top:0;overflow:visible}
+.ttitle{text-align:center;font-size:1.6em;font-weight:900;letter-spacing:.06em;margin:4px 0 2px}
+.ttitle input{font:inherit;text-align:center;border:1px dashed #aaa;border-radius:8px;width:min(520px,90%)}
+.tchamp{text-align:center;font-weight:800;color:#c62828;margin-bottom:6px;min-height:1.3em}
+.tbox{position:absolute;text-align:center;font-size:12px;line-height:1.35;color:#222}
+.tbox .tl{font-weight:800;font-size:13px}
+.tbox .ti{color:#333}
+.tbox .tchips{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:3px}
+.tchip{font:inherit;font-size:11px;border:1px solid #bbb;background:#fff;border-radius:6px;padding:1px 6px;cursor:pointer;color:#444}
+.tchip.win{background:#c62828;border-color:#c62828;color:#fff;font-weight:800}
+.tchip.lose{color:#aaa;text-decoration:line-through}
+.tchip:disabled{cursor:default}
+.tbox input.tin{width:100%;font-size:11px;padding:1px 3px;margin-top:2px;border:1px solid #d9b44a;border-radius:4px;background:#fffdf0;text-align:center}
+.tteam{position:absolute;border:1px dashed #777;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:1.05em;background:#fff;text-align:center;padding:2px}
+.tteam small{font-weight:400;font-size:.68em;color:#666;line-height:1.2;margin-top:2px}
+.tteam.tchamp1{background:#fff3f3;color:#c62828}
+.tteam.edit{cursor:pointer;background:#fffdf3}.tteam.esel{outline:3px solid #e8a500;outline-offset:-3px;background:#fff3c4}
+.tteam input{width:92%;font:inherit;text-align:center;border:1px solid #d9b44a;border-radius:4px}
+.t3{position:absolute;border:1px solid #bbb;border-radius:10px;padding:6px;background:#fafafa}
+@media print{
+  header,#v-groups,#v-tour>.card:first-child,.toast,.modal{display:none!important}
+  body{background:#fff}main{padding:0;max-width:none}#tourBox{box-shadow:none;padding:0;margin:0}
+  .tchip:not(.win){display:none}.tchip.win{background:none;color:#c62828;border:none;padding:0}
+  .tw{overflow:visible}@page{size:A4 landscape;margin:10mm}
+}
 .match.single .slot{border-bottom:none;background:#fff;font-weight:700}.match.single .slot .n::after{content:none}.byetag{font-size:.72em;color:var(--sub);padding:2px 9px 6px;background:#fff}
 .eslot{cursor:pointer;background:#fffdf3}.eslot .nmEdit{flex:1;min-width:0;width:auto;font-weight:700;padding:4px 6px;text-align:left}
 .eslot .swap{color:var(--sub);font-size:1.1em;padding:0 4px}.eslot.esel{outline:3px solid #e8a500;outline-offset:-3px;background:#fff3c4}
@@ -235,6 +263,7 @@ th{color:var(--sub);font-size:.85em}
       <div class="sp"></div>
       <button class="btn" id="resetRes">결과 지우기</button>
       <button class="btn" id="copyTour">📋 복사</button>
+      <button class="btn" id="printTour">🖨 인쇄</button>
  <button class="btn" id="editTour">✏️ 대진 수정</button>
       <button class="pri" id="makeTour" style="padding:9px 16px;font-size:.95em">🎲 대진 다시 뽑기</button>
     </div>
@@ -537,7 +566,7 @@ function syncT(){const c=S.tc;c.src=c.src||'groups';$$('#segSrc button').forEach
   $('#customInfo').textContent=c.src==='custom'?`${customNames().length}팀`:'';
   $$('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v===c.type));
   $('#third').checked=c.third;$('#avoid').checked=c.avoid;[$('#pW').value,$('#pD').value,$('#pL').value]=c.pts;
-  $('#thirdW').style.display=$('#sizeW').style.display=c.type==='single'?'':'none';$('#bsize').value=String(c.size||'auto');$('#byePos').value=c.bye||'edges';$('#byeW').style.display=c.type==='single'?'':'none';
+  $('#thirdW').style.display=c.type==='single'?'':'none';$('#sizeW').style.display='none';$('#bsize').value=String(c.size||'auto');$('#byePos').value=c.bye||'edges';$('#byeW').style.display='none';
   $('#editTour').style.display=c.type==='single'&&S.tour&&S.tour.type==='single'?'':'none';$('#editTour').textContent=editMode?'✔ 수정 끝내기':'✏️ 대진 수정';$('#editTour').classList.toggle('pri',editMode);$('#avoidW').style.display=c.type==='single'&&c.src!=='custom'?'':'none';$('#ptsW').style.display=c.type==='league'?'':'none';}
 $('#segSrc').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.src)return;S.tc.src=b.dataset.v;save();syncT();makeTour();};
 $('#custom').addEventListener('input',e=>{S.tc.custom=e.target.value;save();$('#customInfo').textContent=`${customNames().length}팀`;});
@@ -545,7 +574,7 @@ $('#fillCls').onclick=()=>{let a=+$('#clsFrom').value||1,b=+$('#clsTo').value||a
   S.tc.custom=Array.from({length:b-a+1},(_,i)=>`${a+i}반`).join('\n');$('#custom').value=S.tc.custom;save();syncT();};
 $('#makeCustom').onclick=()=>{if(customNames().length<2)return toast('팀을 2개 이상 적어 주세요');makeTour();toast('대진표를 만들었습니다');};
 $('#byePos').onchange=e=>{S.tc.bye=e.target.value;save();makeTour();toast('부전승 위치를 바꿔 대진을 새로 짰습니다');};
-$('#editTour').onclick=()=>{editMode=!editMode;eSel=null;syncT();renderTour();if(editMode)toast('팀 이름을 고치거나, 두 칸을 차례로 눌러 자리를 바꾸세요');};
+$('#editTour').onclick=()=>{editMode=!editMode;eSel=null;tSel=null;syncT();renderTour();if(editMode)toast('팀 이름을 고치거나, 두 칸을 차례로 눌러 자리를 바꾸세요');};
 $('#bsize').onchange=e=>{S.tc.size=e.target.value==='auto'?'auto':+e.target.value;save();makeTour();toast('시작 라운드를 바꿔 대진을 새로 짰습니다');};
 $('#segType').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.v===S.tc.type)return;S.tc.type=b.dataset.v;syncT();makeTour();};
 ['third','avoid','pW','pD','pL'].forEach(id=>$('#'+id).addEventListener('change',()=>{const c=S.tc;c.third=$('#third').checked;c.avoid=$('#avoid').checked;c.pts=[+$('#pW').value,+$('#pD').value,+$('#pL').value];save();
@@ -556,7 +585,8 @@ function makeTour(){eSel=null;
     :S.groups.filter(g=>g.id!=='__left'&&g.members.length).map(g=>({name:g.name,sub:g.members.map(label).join('·'),parent:g.parent||''}));
   if(ents.length<2){S.tour=null;save();renderTour();return;}
   const pack=e=>({names:e.map(x=>x.name),subs:e.map(x=>x.sub),parents:e.map(x=>x.parent)});
-  if(c.type==='single'){let P=1;while(P<ents.length)P*=2;const want=c.size==='auto'||!c.size?P:+c.size;if(want>P)P=want;const main=Math.min(want,P);const n=ents.length,M=P/2,B=P-n;let slots;
+  if(c.type==='single'){S.tour=makeTree(ents,c);resolveTree(S.tour);save();renderTour();return;}
+  if(c.type==='legacy'){let P=1;while(P<ents.length)P*=2;const want=c.size==='auto'||!c.size?P:+c.size;if(want>P)P=want;const main=Math.min(want,P);const n=ents.length,M=P/2,B=P-n;let slots;
     if((c.bye||'edges')==='edges'&&B<=M){const byeIdx=new Set();for(let k=0,lo=0,hi=M-1;k<B;k++){byeIdx.add(k%2?hi--:lo++);}
       slots=[];let t=0;for(let i=0;i<M;i++){if(byeIdx.has(i)){const top=i<M/2;slots.push(top?t++:-1,top?-1:t++);}else{slots.push(t++,t++);}}}
     else slots=seedOrder(P).map(sd=>sd<=n?sd-1:-1);
@@ -590,8 +620,61 @@ function standings(){const T=S.tour,[W,D,L]=S.tc.pts,s=T.names.map((name,i)=>({i
   T.rounds.flat().forEach(m=>{if(!num(m.sa)||!num(m.sb))return;const a=s[m.a],b=s[m.b],x=+m.sa,y=+m.sb;a.p++;b.p++;a.gf+=x;a.ga+=y;b.gf+=y;b.ga+=x;
     if(x>y){a.w++;b.l++;a.pts+=W;b.pts+=L;h[m.a+'>'+m.b]=1;}else if(x<y){b.w++;a.l++;b.pts+=W;a.pts+=L;h[m.b+'>'+m.a]=1;}else{a.d++;b.d++;a.pts+=D;b.pts+=D;}});
   return s.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||(h[b.i+'>'+a.i]?1:h[a.i+'>'+b.i]?-1:0));}
-function renderTour(){const T=S.tour,box=$('#tourBox');$('#editTour').style.display=T&&T.type==='single'?'':'none';if(!T||T.type!=='single')editMode=false;$('#editTour').textContent=editMode?'✔ 수정 끝내기':'✏️ 대진 수정';$('#editTour').classList.toggle('pri',editMode);
+/* ===== 세로형(학교식) 토너먼트 ===== */
+function buildTree(n){const nodes=[];
+  function rec(lo,cnt,side,depth){if(cnt===1)return{t:'s',v:lo};let a=Math.ceil(cnt/2),b=cnt-a;
+    if(side==='L'&&a>b)[a,b]=[b,a];if(side==='R'&&a<b)[a,b]=[b,a];
+    const id=nodes.length;nodes.push(null);const c0=rec(lo,a,side||'L',depth+1),c1=rec(lo+a,b,side||'R',depth+1);
+    const hh=c=>c.t==='s'?0:nodes[c.v].h;nodes[id]={c:[c0,c1],h:Math.max(hh(c0),hh(c1))+1,depth,lo,info:{d:'',p:'',t:''},w:null,label:''};return{t:'m',v:id};}
+  const r=rec(0,n,null,0);const root=r.t==='m'?r.v:-1;
+  if(root>=0){nodes[root].label='결승';const sf=nodes[root].c.filter(c=>c.t==='m');
+    sf.forEach((c,i)=>nodes[c.v].label=sf.length>1?`준결승 ${i+1}경기`:'준결승');
+    let k=1;nodes.map((nd,i)=>i).filter(i=>!nodes[i].label).sort((x,y)=>nodes[x].h-nodes[y].h||nodes[y].depth-nodes[x].depth||nodes[x].lo-nodes[y].lo).forEach(i=>nodes[i].label=`${k++}경기`);}
+  return{nodes,root};}
+function makeTree(ents,c){const n=ents.length,tr=buildTree(n);
+  const clash=e=>tr.nodes.reduce((k,nd)=>{const[a,b]=nd.c;return k+(a.t==='s'&&b.t==='s'&&e[a.v].parent&&e[a.v].parent===e[b.v].parent?1:0);},0);
+  let best=null,bk=1e9;const tries=(c.avoid&&c.src==='groups')?600:1;for(let t=0;t<tries&&bk>0;t++){const e=shuffle(ents.slice()),k=tries>1?clash(e):0;if(k<bk){bk=k;best=e;}}
+  return{type:'tree',title:S.title||'',names:best.map(x=>x.name),subs:best.map(x=>x.sub),parents:best.map(x=>x.parent),
+    leaves:best.map((_,i)=>i),nodes:tr.nodes,root:tr.root,third:c.third&&n>=4?{info:{d:'',p:'',t:''},w:null}:null};}
+const tPart=(T,ch)=>ch.t==='s'?T.leaves[ch.v]:(T.nodes[ch.v].w??null);
+function resolveTree(T){const order=T.nodes.map((_,i)=>i).sort((a,b)=>T.nodes[a].h-T.nodes[b].h);
+  order.forEach(i=>{const nd=T.nodes[i],ps=nd.c.map(ch=>tPart(T,ch));if(nd.w!==null&&(ps.includes(null)||!ps.includes(nd.w)))nd.w=null;});
+  if(T.third){const ps=thirdParts(T);if(T.third.w!==null&&(ps.includes(null)||!ps.includes(T.third.w)))T.third.w=null;}}
+function thirdParts(T){const r=T.nodes[T.root];if(!r)return[null,null];return r.c.map(ch=>{if(ch.t!=='m')return null;const nd=T.nodes[ch.v],ps=nd.c.map(x=>tPart(T,x));return nd.w===null||ps.includes(null)?null:ps.find(p=>p!==nd.w);});}
+let tSel=null;
+function renderTree(T,box){
+  const n=T.leaves.length,colW=n>14?84:n>10?96:108,rowH=124,top=8,teamH=78;
+  const root=T.nodes[T.root],H=root?root.h:0,W=n*colW,teamY=top+H*rowH;
+  const pos=[];const cx=ch=>ch.t==='s'?(ch.v+.5)*colW:pos[ch.v].x,cy=ch=>ch.t==='s'?teamY:pos[ch.v].y;
+  const ord=T.nodes.map((_,i)=>i).sort((a,b)=>T.nodes[a].h-T.nodes[b].h);
+  ord.forEach(i=>{const nd=T.nodes[i];pos[i]={x:(cx(nd.c[0])+cx(nd.c[1]))/2,y:top+(H-nd.h)*rowH};});
+  let svg='',html='';const RED='#c62828',INK='#333';
+  ord.forEach(i=>{const nd=T.nodes[i],p=pos[i];
+    nd.c.forEach(ch=>{const won=nd.w!==null&&tPart(T,ch)===nd.w;
+      svg+=`<path d="M${cx(ch)} ${cy(ch)}V${p.y}H${p.x}" fill="none" stroke="${won?RED:INK}" stroke-width="${won?3.2:1.3}" stroke-linejoin="miter"/>`;});
+    const x0=Math.min(cx(nd.c[0]),cx(nd.c[1])),x1=Math.max(cx(nd.c[0]),cx(nd.c[1]));let bw=x1-x0-8;if(i===T.root)bw=Math.min(bw,200);
+    const ps=nd.c.map(ch=>tPart(T,ch)),inf=nd.info||{};
+    const info=editMode?`<input class="tin" data-n="${i}" data-f="d" value="${esc(inf.d||'')}" placeholder="날짜"><input class="tin" data-n="${i}" data-f="p" value="${esc(inf.p||'')}" placeholder="경기장"><input class="tin" data-n="${i}" data-f="t" value="${esc(inf.t||'')}" placeholder="시간">`
+      :`<div class="ti">${[inf.d,inf.p,inf.t].filter(Boolean).map(esc).join('<br>')}</div>`;
+    const chips=ps.every(v=>v!==null)?`<div class="tchips">${ps.map(v=>`<button class="tchip${nd.w===null?'':nd.w===v?' win':' lose'}" data-n="${i}" data-v="${v}"${canWrite&&!editMode?'':' disabled'}>${esc(T.names[v])}</button>`).join('')}</div>`:'';
+    html+=`<div class="tbox" style="left:${p.x-bw/2}px;top:${p.y+5}px;width:${bw}px"><div class="tl">${esc(nd.label)}</div>${info}${chips}</div>`;});
+  const champ=root&&root.w!==null?root.w:null;
+  T.leaves.forEach((v,pIdx)=>{const sel=tSel===pIdx;
+    html+=`<div class="tteam${editMode?' edit':''}${sel?' esel':''}${champ===v?' tchamp1':''}" data-pos="${pIdx}" style="left:${pIdx*colW}px;top:${teamY}px;width:${colW}px;height:${teamH}px;${pIdx?'border-left:none;':''}">${editMode?`<input class="tname" data-idx="${v}" value="${esc(T.names[v])}">`:esc(T.names[v])}${T.subs[v]?`<small>${esc(T.subs[v])}</small>`:''}</div>`;});
+  if(T.third&&root){const ps=thirdParts(T),rx=pos[T.root]?Math.max(...root.c.map(cx)):W*.75,left=Math.min(rx+14,W-150),w=Math.max(130,W-left-4),inf=T.third.info||{};
+    html+=`<div class="t3 tbox" style="left:${left}px;top:${top}px;width:${w}px"><div class="tl">3·4위전</div>${editMode?`<input class="tin" data-n="third" data-f="d" value="${esc(inf.d||'')}" placeholder="날짜"><input class="tin" data-n="third" data-f="p" value="${esc(inf.p||'')}" placeholder="경기장"><input class="tin" data-n="third" data-f="t" value="${esc(inf.t||'')}" placeholder="시간">`:`<div class="ti">${[inf.d,inf.p,inf.t].filter(Boolean).map(esc).join('<br>')}</div>`}
+      ${ps.every(v=>v!==null)?`<div class="tchips">${ps.map(v=>`<button class="tchip${T.third.w===null?'':T.third.w===v?' win':' lose'}" data-n="third" data-v="${v}"${canWrite&&!editMode?'':' disabled'}>${esc(T.names[v])}</button>`).join('')}</div>`:'<div class="ti" style="color:#999">준결승 후 결정</div>'}</div>`;}
+  const title=T.title||S.title||'대진표';
+  const second=champ!==null?root.c.map(ch=>tPart(T,ch)).find(v=>v!==champ):null;
+  box.innerHTML=`<div class="ttitle">${editMode?`<input id="ttitle" value="${esc(title)}">`:esc(title)}</div>
+    <div class="tchamp">${champ!==null?`🏆 우승 ${esc(T.names[champ])} · 🥈 준우승 ${esc(T.names[second])}${T.third&&T.third.w!==null?` · 🥉 3위 ${esc(T.names[T.third.w])}`:''}`:''}</div>
+    <div class="tw"><div class="tree" style="width:${W}px;height:${teamY+teamH+6}px"><svg width="${W}" height="${teamY+teamH}">${svg}</svg>${html}</div></div>`;
+  const firsts=T.nodes.filter(nd=>nd.c.every(c=>c.t==='s')).length;
+  $('#tourHint').textContent=`${n}팀 토너먼트 · 총 ${T.nodes.length+(T.third?1:0)}경기 (첫 경기 ${firsts}개)${editMode?' — 수정 중: 반 이름 칸을 두 번 눌러 자리 바꾸기, 날짜·경기장·시간 입력':canWrite?' — 경기 칸의 이긴 팀 이름을 누르세요':' — 결과가 입력되면 자동으로 바뀝니다'}`;
+}
+function renderTour(){const T=S.tour,box=$('#tourBox');$('#editTour').style.display=T&&(T.type==='single'||T.type==='tree')?'':'none';$('#printTour').style.display=T&&T.type==='tree'?'':'none';if(!T||(T.type!=='single'&&T.type!=='tree'))editMode=false;$('#editTour').textContent=editMode?'✔ 수정 끝내기':'✏️ 대진 수정';$('#editTour').classList.toggle('pri',editMode);
   if(!T){box.innerHTML=S.tc.src==='custom'?'<div class="empty">위에 참가팀(예: 1반, 2반…)을 적고 <b>🎲 이 팀들로 대진표 만들기</b>를 누르세요.</div>':'<div class="empty">👥 조 편성에서 조를 짠 뒤 <b>🏆 이 조로 대진표</b>를 누르세요.<br>반 대항전처럼 팀을 직접 넣으려면 위에서 <b>✏️ 직접 입력</b>을 고르세요.</div>';$('#tourHint').textContent='';return;}
+  if(T.type==='tree'){renderTree(T,box);return;}
   if(T.type==='single'){const R=T.rounds,P=R[0].length*2,f=R[R.length-1][0],byes=R[0].filter(m=>(m.a===-1)!==(m.b===-1)).length;
     const k=prelimN(T),pre=R.slice(0,k).flat().filter(m=>m.a!==-1&&m.b!==-1).length;
     $('#tourHint').textContent=`${T.names.length}팀 · `+(k?`예선 ${pre}경기 → ${rName(T.main)}`:nStart(T)?`${nStart(T)}강부터 · 1라운드 ${R[0].length-byes}경기, 부전승 ${byes}팀`:`${rName(P)}부터${byes?` · 부전승 ${byes}팀`:''}`)+` ${canWrite?'— 이긴 팀 이름을 누르거나 점수를 입력하세요':'— 결과가 입력되면 자동으로 바뀝니다'}`;
@@ -618,8 +701,22 @@ $('#tourBox').addEventListener('change',e=>{if(e.target.classList.contains('nmEd
   const{k,sc}=e.target.dataset;if(!k||!sc)return;const m=getM(k);m[sc]=e.target.value.trim();
   if(S.tour.type==='single'&&num(m.sa)&&num(m.sb)&&+m.sa!==+m.sb)m.w=+m.sa>+m.sb?m.a:m.b;resolve();save();renderTour();});
 $('#makeTour').onclick=()=>{makeTour();toast('대진을 다시 뽑았습니다');};
-$('#resetRes').onclick=()=>{const T=S.tour;if(!T)return;T.rounds.flat().concat(T.third?[T.third]:[]).forEach(m=>{m.w=null;m.sa='';m.sb='';});resolve();save();renderTour();};
-$('#copyTour').onclick=()=>{const T=S.tour;if(!T)return;const L=i=>nm(i)+(i>=0&&T.subs[i]?`(${T.subs[i]})`:'');let t='';
+$('#tourBox').addEventListener('click',e=>{const T=S.tour;if(!T||T.type!=='tree')return;
+  const chip=e.target.closest('.tchip');if(chip&&!chip.disabled){const n=chip.dataset.n,v=+chip.dataset.v,m=n==='third'?T.third:T.nodes[+n];m.w=m.w===v?null:v;resolveTree(T);save();renderTour();return;}
+  if(!editMode||e.target.tagName==='INPUT')return;const tm=e.target.closest('.tteam');if(!tm)return;const p=+tm.dataset.pos;
+  if(tSel===null){tSel=p;renderTour();return;}if(tSel===p){tSel=null;renderTour();return;}
+  [T.leaves[tSel],T.leaves[p]]=[T.leaves[p],T.leaves[tSel]];tSel=null;
+  const had=T.nodes.some(nd=>nd.w!==null)||(T.third&&T.third.w!==null);T.nodes.forEach(nd=>nd.w=null);if(T.third)T.third.w=null;save();renderTour();toast(had?'자리를 바꿨습니다 (입력된 결과는 지웠습니다)':'자리를 바꿨습니다');});
+$('#tourBox').addEventListener('change',e=>{const T=S.tour;if(!T||T.type!=='tree')return;const t=e.target;
+  if(t.id==='ttitle'){T.title=t.value.trim();save();return;}
+  if(t.classList.contains('tin')){const n=t.dataset.n,m=n==='third'?T.third:T.nodes[+n];m.info=m.info||{};m.info[t.dataset.f]=t.value.trim();save();return;}
+  if(t.classList.contains('tname')){const i=+t.dataset.idx,v=t.value.trim();if(v){T.names[i]=v;save();}}});
+$('#printTour').onclick=()=>{if(editMode){editMode=false;tSel=null;renderTour();}setTimeout(()=>window.print(),50);};
+$('#resetRes').onclick=()=>{const T=S.tour;if(!T)return;if(T.type==='tree'){T.nodes.forEach(nd=>nd.w=null);if(T.third)T.third.w=null;save();renderTour();return;}T.rounds.flat().concat(T.third?[T.third]:[]).forEach(m=>{m.w=null;m.sa='';m.sb='';});resolve();save();renderTour();};
+$('#copyTour').onclick=()=>{const T=S.tour;if(!T)return;if(T.type==='tree'){const ord=T.nodes.map((_,i)=>i).sort((a,b)=>T.nodes[a].h-T.nodes[b].h||(T.nodes[a].label.localeCompare(T.nodes[b].label,'ko',{numeric:true})));
+    const nmv=v=>v===null?'(대기)':T.names[v],line=(lb,nd,ps)=>`[${lb}] ${[nd.info?.d,nd.info?.p,nd.info?.t].filter(Boolean).join(' ')}\n  ${nmv(ps[0])} vs ${nmv(ps[1])}${nd.w!==null?` → ${T.names[nd.w]} 승`:''}`;
+    let t=`${T.title||S.title||'대진표'}\n`+ord.map(i=>line(T.nodes[i].label,T.nodes[i],T.nodes[i].c.map(ch=>tPart(T,ch)))).join('\n');
+    if(T.third)t+='\n'+line('3·4위전',T.third,thirdParts(T));copy(t);return;}const L=i=>nm(i)+(i>=0&&T.subs[i]?`(${T.subs[i]})`:'');let t='';
   if(T.type==='single'){const P=T.rounds[0].length*2;T.rounds.forEach((rd,r)=>{t+=`[${rLabel(T,r)}]\n`;rd.forEach(m=>{if(m.a===-1||m.b===-1)return;t+=`${L(m.a)} ${m.sa} vs ${m.sb} ${L(m.b)}${m.w!==null?` → ${nm(m.w)} 승`:''}\n`;});});
     if(T.third)t+=`[3·4위전]\n${L(T.third.a)} vs ${L(T.third.b)}${T.third.w!==null?` → ${nm(T.third.w)} 승`:''}\n`;}
   else t='순위\t팀\t승\t무\t패\t득실\t승점\n'+standings().map((s,i)=>`${i+1}\t${s.name}\t${s.w}\t${s.d}\t${s.l}\t${s.gf-s.ga}\t${s.pts}`).join('\n');copy(t);};
