@@ -1,6 +1,7 @@
 // 조 편성·토너먼트 메이커 — 공유 저장 API (Vercel Function + Upstash Redis REST)
 // 환경변수: KV_REST_API_URL / KV_REST_API_TOKEN (Upstash 연결 시 자동)
 //   ADMIN_PIN(관리자: 전부 편집) / REF_PIN(심판: 경기 결과만 입력) / VIEW_PIN(학생 열람, 비우면 누구나 보기)
+// (REF_PIN 적용 재배포)
 // 저장 구조: tm:ws(대진 탭 원본) · tm:res:<탭id>(경기 결과, 경기마다 따로) · tm:log:<탭id>(입력 기록) · tm:rev(변경 번호)
 const RURL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const RTOK = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
